@@ -225,6 +225,24 @@ label.lab{display:block;font-size:12px;font-weight:700;margin-bottom:5px}
   <div class="wrap hidden" id="view-sin"><div class="sectit"><h2 class="dsp">Sinistres & maintenance</h2><button class="btn pri" id="addSinBtn">+ Déclarer un sinistre</button></div><div id="sinFilters" style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap"></div><div id="sinList"><div class="loading">Chargement…</div></div></div>
 </div>
 
+<!-- ESPACE LOCATAIRE -->
+<div id="tenantApp" class="hidden">
+  <div class="topbar">
+    <span class="mk">🏠</span><div class="name">ImmoGestion<span>Espace locataire</span></div>
+    <div class="right"><span class="email" id="tUserEmail"></span><button class="btn gh" id="tLogoutBtn" style="padding:9px 14px;font-size:12.5px">Déconnexion</button></div>
+  </div>
+  <div class="tabs">
+    <button class="tab on" data-tview="thome">🏠 Mon logement</button>
+    <button class="tab" data-tview="tcontract">📄 Mon contrat</button>
+    <button class="tab" data-tview="tpay">💳 Mes paiements</button>
+    <button class="tab" data-tview="tsin">🛠️ Mes sinistres</button>
+  </div>
+  <div class="wrap" id="tview-thome"></div>
+  <div class="wrap hidden" id="tview-tcontract"></div>
+  <div class="wrap hidden" id="tview-tpay"></div>
+  <div class="wrap hidden" id="tview-tsin"></div>
+</div>
+
 <!-- MODALE BIEN -->
 <div class="ov hidden" id="bienModal"><div class="modal">
   <div class="mh"><h3 class="dsp">Ajouter un bien</h3><button data-close>×</button></div>
@@ -299,7 +317,7 @@ const PAY={paye:['green','Payé'],en_attente:['amber','En attente'],retard:['red
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
-let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null;
+let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null;
 const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[]};
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
@@ -322,7 +340,12 @@ $('authBtn').onclick=async()=>{const email=$('email').value.trim(),password=$('p
 function trad(m){if(/Invalid login/i.test(m))return'Email ou mot de passe incorrect.';if(/already/i.test(m))return'Cet email a déjà un compte.';if(/6 char/i.test(m))return'Mot de passe : 6 caractères minimum.';return m;}
 $('logoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload();};
 
-async function openApp(u){state.user=u;hide('auth');hide('setup');show('app');$('userEmail').textContent=u.email;await loadAll();}
+async function openApp(u){state.user=u;hide('auth');hide('setup');
+  // Détection du rôle : si l'email connecté correspond à une fiche locataire -> espace locataire
+  let myT=null; try{const{data}=await sb.from('tenants').select('*');if(data)myT=data.find(x=>x.email&&x.email.toLowerCase()===(u.email||'').toLowerCase())||null;}catch(e){}
+  myTenant=myT; role=myTenant?'tenant':'owner';
+  if(role==='tenant'){hide('app');show('tenantApp');$('tUserEmail').textContent=u.email;await loadTenant();}
+  else{hide('tenantApp');show('app');$('userEmail').textContent=u.email;await loadAll();}}
 async function loadAll(){
   const [p,t,c,pay,inc]=await Promise.all([
     sb.from('properties').select('*').order('created_at',{ascending:false}),
@@ -338,7 +361,7 @@ async function loadAll(){
 const prop=(id)=>state.properties.find(x=>x.id===id),ten=(id)=>state.tenants.find(x=>x.id===id),contr=(id)=>state.contracts.find(x=>x.id===id);
 const initials=(n)=>(n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
 
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));});
+document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));});
 
 /* ===== DASHBOARD with charts + insights ===== */
 function monthKey(d){const dt=new Date(d);return isNaN(dt)?null:dt.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});}
@@ -414,7 +437,7 @@ $('locphotobox').onclick=()=>$('l_photo').click();
 $('l_photo').onchange=(e)=>{locPhotoFile=e.target.files[0];if(locPhotoFile){const r=new FileReader();r.onload=()=>$('locPhotoPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(locPhotoFile);}};
 $('saveLoc').onclick=async()=>{const full_name=$('l_name').value.trim();if(!full_name){toast('Le nom est requis');return;}$('saveLoc').disabled=true;
   const photo_url=await uploadPhoto(locPhotoFile);
-  const {error}=await sb.from('tenants').insert({full_name,phone:$('l_phone').value.trim(),cni:$('l_cni').value.trim(),email:$('l_email').value.trim(),photo_url});
+  const {error}=await sb.from('tenants').insert({full_name,phone:$('l_phone').value.trim(),cni:$('l_cni').value.trim(),email:$('l_email').value.trim().toLowerCase(),photo_url});
   $('saveLoc').disabled=false;if(error){toast('Erreur : '+error.message);return;}
   ['l_name','l_phone','l_cni','l_email'].forEach(i=>$(i).value='');$('l_photo').value='';hide('locModal');toast('Locataire ajouté ✓');await loadAll();};
 
@@ -442,12 +465,13 @@ $('savePay').onclick=async()=>{const c=contr($('p_contract').value);if(!c){toast
 function relanceWA(id){const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, petit rappel concernant le loyer ${p.period?'de '+p.period:''} d'un montant de ${fmt(p.amount)} FCFA pour ${pr?pr.name:'votre logement'}. Merci de bien vouloir régulariser. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
 
 /* ===== SINISTRES ===== */
+function sinCardHTML(i){const k=SKIND[i.type]||SKIND.autre,pr=prop(i.property_id),pp=SPRIO[i.priority]||SPRIO.moyen,stIdx=SFLOW.findIndex(s=>s[0]===i.status),stLbl=(SFLOW[stIdx]||SFLOW[0])[1];
+  return `<div class="scard" onclick="openSin('${i.id}')"><div class="sph">${i.photo_before?`<img src="${esc(i.photo_before)}">`:`<div class="noimg">${k[0]}</div>`}<span class="b ${pp[0]} pr"><span class="d"></span>${pp[1]}</span></div><div class="sb"><div class="stt">${k[0]} ${esc(i.title)}</div><div class="smeta">${esc(pr?pr.name:'—')} · ${i.created_at?i.created_at.slice(0,10):''}</div><div class="sf"><span class="b ${i.status==='cloture'?'green':'amber'}"><span class="d"></span>${stLbl}</span>${i.cost?`<span class="smeta">${fmt(i.cost)} FCFA</span>`:''}</div></div></div>`;}
 function renderSin(){
   $('sinFilters').innerHTML=[['all','Tous'],...SFLOW].map(([k,l])=>`<button class="tab ${sinFilter===k?'on':''}" onclick="setSinFilter('${k}')">${l}</button>`).join('');
   let l=state.incidents; if(sinFilter!=='all')l=l.filter(i=>i.status===sinFilter);
   if(!l.length){$('sinList').innerHTML='<div class="empty"><div class="big">🛠️</div>Aucun sinistre dans cette catégorie.</div>';return;}
-  $('sinList').innerHTML='<div class="grid">'+l.map(i=>{const k=SKIND[i.type]||SKIND.autre,pr=prop(i.property_id),pp=SPRIO[i.priority]||SPRIO.moyen,stIdx=SFLOW.findIndex(s=>s[0]===i.status),stLbl=(SFLOW[stIdx]||SFLOW[0])[1];
-    return `<div class="scard" onclick="openSin('${i.id}')"><div class="sph">${i.photo_before?`<img src="${esc(i.photo_before)}">`:`<div class="noimg">${k[0]}</div>`}<span class="b ${pp[0]} pr"><span class="d"></span>${pp[1]}</span></div><div class="sb"><div class="stt">${k[0]} ${esc(i.title)}</div><div class="smeta">${esc(pr?pr.name:'—')} · ${i.created_at?i.created_at.slice(0,10):''}</div><div class="sf"><span class="b ${i.status==='cloture'?'green':'amber'}"><span class="d"></span>${stLbl}</span>${i.cost?`<span class="smeta">${fmt(i.cost)} FCFA</span>`:''}</div></div></div>`;}).join('')+'</div>';
+  $('sinList').innerHTML='<div class="grid">'+l.map(sinCardHTML).join('')+'</div>';
 }
 function setSinFilter(k){sinFilter=k;renderSin();}
 $('addSinBtn').onclick=()=>{if(!state.properties.length){toast('Ajoute d\'abord un bien.');return;}sinPhotoFile=null;$('sinPhotoPreview').innerHTML='';$('s_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');show('sinModal');};
@@ -456,29 +480,34 @@ $('s_photo').onchange=(e)=>{sinPhotoFile=e.target.files[0];if(sinPhotoFile){cons
 $('saveSin').onclick=async()=>{const desc=$('s_desc').value.trim();if(!desc){toast('Décris le sinistre');return;}$('saveSin').disabled=true;
   const photo_before=await uploadPhoto(sinPhotoFile);
   const title=desc.length>40?desc.slice(0,40)+'…':desc;
-  const c=state.contracts.find(x=>x.property_id===$('s_prop').value);
-  const cmt=[{author:'Bailleur',text:desc,date:new Date().toISOString().slice(0,10)}];
-  const {error}=await sb.from('incidents').insert({property_id:$('s_prop').value,tenant_id:c?c.tenant_id:null,title,description:desc,type:$('s_type').value,priority:$('s_priority').value,status:'declare',photo_before,comments:cmt});
+  const author=role==='tenant'?'Locataire':'Bailleur';
+  let tenant_id;
+  if(role==='tenant')tenant_id=myTenant.id;
+  else{const c=state.contracts.find(x=>x.property_id===$('s_prop').value);tenant_id=c?c.tenant_id:null;}
+  const cmt=[{author,text:desc,date:new Date().toISOString().slice(0,10)}];
+  const {error}=await sb.from('incidents').insert({property_id:$('s_prop').value,tenant_id,title,description:desc,type:$('s_type').value,priority:$('s_priority').value,status:'declare',photo_before,comments:cmt});
   $('saveSin').disabled=false;if(error){toast('Erreur : '+error.message);return;}
-  $('s_desc').value='';$('s_photo').value='';hide('sinModal');toast('Sinistre déclaré ✓');await loadAll();$('sinFilters')&&setSinFilter('all');};
+  $('s_desc').value='';$('s_photo').value='';hide('sinModal');toast('Sinistre déclaré ✓');
+  if(role==='tenant')await loadTenant();else{await loadAll();$('sinFilters')&&setSinFilter('all');}};
 let curSin=null;
 function openSin(id){curSin=id;const i=state.incidents.find(x=>x.id===id);const k=SKIND[i.type]||SKIND.autre,pr=prop(i.property_id),t=ten(i.tenant_id),stIdx=SFLOW.findIndex(s=>s[0]===i.status);
+  const isOwner=role==='owner';
   $('sd_title').textContent=k[0]+' '+i.title;
   const comments=Array.isArray(i.comments)?i.comments:[];
   const cColor=(a)=>a&&a.toLowerCase().includes('locataire')?'#2d6fb0':(a&&a.toLowerCase().includes('répar')?'var(--gold-600)':'var(--green-700)');
   $('sd_body').innerHTML=`
-    <div class="smeta" style="color:var(--muted);font-size:12.5px;margin-bottom:12px">${esc(pr?pr.name:'—')}${t?' · '+esc(t.full_name):''} · déclaré le ${i.created_at?i.created_at.slice(0,10):''}</div>
+    <div class="smeta" style="color:var(--muted);font-size:12.5px;margin-bottom:12px">${esc(pr?pr.name:'—')}${t&&isOwner?' · '+esc(t.full_name):''} · déclaré le ${i.created_at?i.created_at.slice(0,10):''}</div>
     <div class="timeline">${SFLOW.map((s,idx)=>`<div class="step ${idx<stIdx?'done':idx===stIdx?'cur':''}"><div class="bar"></div><div class="dot">${idx<stIdx?'✓':idx+1}</div><div class="lbl">${s[1]}</div></div>`).join('')}</div>
-    ${i.status!=='cloture'?`<button class="btn pri full" style="margin:10px 0 16px" onclick="advanceSin()">Faire avancer → ${SFLOW[Math.min(stIdx+1,3)][1]}</button>`:`<div class="b green" style="margin:8px 0 16px"><span class="d"></span>Sinistre clôturé</div>`}
+    ${isOwner?(i.status!=='cloture'?`<button class="btn pri full" style="margin:10px 0 16px" onclick="advanceSin()">Faire avancer → ${SFLOW[Math.min(stIdx+1,3)][1]}</button>`:`<div class="b green" style="margin:8px 0 16px"><span class="d"></span>Sinistre clôturé</div>`):(i.status==='cloture'?`<div class="b green" style="margin:10px 0 16px"><span class="d"></span>Sinistre clôturé</div>`:`<div class="b amber" style="margin:10px 0 16px"><span class="d"></span>En cours de traitement</div>`)}
     <div class="photopair">
       <div class="pp">${i.photo_before?`<img src="${esc(i.photo_before)}">`:'📷'}<div class="cap">AVANT</div></div>
-      <div class="pp ${i.photo_after?'':'add'}" ${i.photo_after?'':"onclick=\"addAfter()\""}>${i.photo_after?`<img src="${esc(i.photo_after)}"><div class="cap">APRÈS</div>`:'📷<span>Ajouter photo « après »</span>'}</div>
+      <div class="pp ${i.photo_after?'':(isOwner?'add':'')}" ${i.photo_after?'':(isOwner?"onclick=\"addAfter()\"":'')}>${i.photo_after?`<img src="${esc(i.photo_after)}"><div class="cap">APRÈS</div>`:(isOwner?'📷<span>Ajouter photo « après »</span>':'<span class="smeta">Photo « après » à venir</span>')}</div>
     </div>
-    <div class="frow"><div><label class="lab">Coût (FCFA)</label><input class="inp" id="sd_cost" type="number" value="${i.cost||''}"></div><div><label class="lab">Réparateur</label><input class="inp" id="sd_contractor" value="${esc(i.contractor||'')}"></div></div>
-    <button class="btn gh" style="margin-bottom:16px" onclick="saveSinMeta()">💾 Enregistrer coût/réparateur</button>
-    <label class="lab">Suivi & commentaires</label>
+    ${isOwner?`<div class="frow"><div><label class="lab">Coût (FCFA)</label><input class="inp" id="sd_cost" type="number" value="${i.cost||''}"></div><div><label class="lab">Réparateur</label><input class="inp" id="sd_contractor" value="${esc(i.contractor||'')}"></div></div>
+    <button class="btn gh" style="margin-bottom:16px" onclick="saveSinMeta()">💾 Enregistrer coût/réparateur</button>`:(i.cost?`<div class="row"><div class="nm" style="color:var(--muted)">Coût des travaux</div><div style="margin-left:auto;font-weight:700">${fmt(i.cost)} FCFA${i.contractor?' · '+esc(i.contractor):''}</div></div>`:'')}
+    <label class="lab" style="margin-top:8px">Suivi & commentaires</label>
     <div style="margin-bottom:12px">${comments.length?comments.map(c=>`<div class="cmt"><div class="ca" style="background:${cColor(c.author)}">${initials(c.author)}</div><div><div class="cb"><div class="cau">${esc(c.author)}</div>${esc(c.text)}<div class="cd">${esc(c.date||'')}</div></div></div></div>`).join(''):'<div class="smeta" style="color:var(--faint)">Aucun commentaire.</div>'}</div>
-    <div style="display:flex;gap:8px"><input class="inp" id="sd_newcmt" placeholder="Ajouter un commentaire…" style="margin-bottom:0"><button class="btn pri" onclick="addCmt()">Envoyer</button></div>`;
+    ${isOwner?`<div style="display:flex;gap:8px"><input class="inp" id="sd_newcmt" placeholder="Ajouter un commentaire…" style="margin-bottom:0"><button class="btn pri" onclick="addCmt()">Envoyer</button></div>`:''}`;
   show('sinDetail');
 }
 async function advanceSin(){const i=state.incidents.find(x=>x.id===curSin);const idx=SFLOW.findIndex(s=>s[0]===i.status);const next=SFLOW[Math.min(idx+1,3)][0];const upd={status:next};if(next==='cloture')upd.resolved_at=new Date().toISOString().slice(0,10);const {error}=await sb.from('incidents').update(upd).eq('id',curSin);if(error){toast(error.message);return;}toast('Statut mis à jour ✓');await loadAll();openSin(curSin);}
@@ -487,13 +516,85 @@ async function addCmt(){const txt=$('sd_newcmt').value.trim();if(!txt)return;con
 function addAfter(){$('afterPhotoInput').click();}
 $('afterPhotoInput').onchange=async(e)=>{const f=e.target.files[0];if(!f||!curSin)return;toast('Envoi de la photo…');const url=await uploadPhoto(f);if(!url)return;const {error}=await sb.from('incidents').update({photo_after:url}).eq('id',curSin);$('afterPhotoInput').value='';if(error){toast(error.message);return;}toast('Photo « après » ajoutée ✓');await loadAll();openSin(curSin);};
 
+/* ===== PORTAIL LOCATAIRE ===== */
+document.querySelectorAll('#tenantApp .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#tenantApp .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['thome','tcontract','tpay','tsin'].forEach(v=>$('tview-'+v).classList.toggle('hidden',v!==t.dataset.tview));});
+$('tLogoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload();};
+
+async function loadTenant(){
+  const tid=myTenant.id;
+  const [c,pay,inc]=await Promise.all([
+    sb.from('contracts').select('*').eq('tenant_id',tid).order('created_at',{ascending:false}),
+    sb.from('payments').select('*').eq('tenant_id',tid).order('created_at',{ascending:false}),
+    sb.from('incidents').select('*').eq('tenant_id',tid).order('created_at',{ascending:false}),
+  ]);
+  state.contracts=c.data||[];state.payments=pay.data||[];state.incidents=inc.data||[];state.tenants=[myTenant];
+  const ids=[...new Set(state.contracts.map(x=>x.property_id).filter(Boolean))];
+  if(ids.length){const {data:pr}=await sb.from('properties').select('*').in('id',ids);state.properties=pr||[];}else state.properties=[];
+  renderTenantHome();renderTenantContract();renderTenantPay();renderTenantSin();
+}
+
+function renderTenantHome(){
+  const c=state.contracts[0],p=c?prop(c.property_id):null;
+  const paid=state.payments.filter(x=>x.status==='paye'),encaisse=paid.reduce((s,x)=>s+(x.amount||0),0);
+  const due=state.payments.filter(x=>x.status!=='paye'),dueAmt=due.reduce((s,x)=>s+(x.amount||0),0);
+  const sinOuverts=state.incidents.filter(i=>i.status!=='cloture').length;
+  $('tview-thome').innerHTML=`
+    <div class="hero"><h2 class="dsp">Bonjour 👋</h2><p>Bienvenue dans votre espace locataire.</p></div>
+    ${p?`<div class="grid" style="margin-bottom:16px"><div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b green st"><span class="d"></span>Mon logement</span></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type||'')}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`:'<div class="empty"><div class="big">🏠</div>Aucun logement associé pour le moment. Contactez votre bailleur.</div>'}
+    <div class="kpis stagger">
+      <div class="kpi"><div class="ic" style="background:var(--green-50);color:var(--green-700)">🏠</div><div class="lbl">Loyer mensuel</div><div class="val dsp">${fmt(c?c.rent_amount:0)} <small>FCFA</small></div></div>
+      <div class="kpi"><div class="ic" style="background:var(--green-50);color:var(--green-700)">✅</div><div class="lbl">Total payé</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:var(--green-600)">${paid.length} paiement(s)</div></div>
+      <div class="kpi"><div class="ic" style="background:var(--red-bg);color:var(--red)">⚠️</div><div class="lbl">À régler</div><div class="val dsp">${fmt(dueAmt)} <small>FCFA</small></div><div class="tr" style="color:var(--red)">${due.length} en attente</div></div>
+      <div class="kpi"><div class="ic" style="background:var(--amber-bg);color:var(--amber)">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
+    </div>`;
+}
+
+function renderTenantContract(){
+  const c=state.contracts[0];
+  if(!c){$('tview-tcontract').innerHTML='<div class="sectit"><h2 class="dsp">Mon contrat</h2></div><div class="empty"><div class="big">📄</div>Aucun contrat pour le moment.</div>';return;}
+  const p=prop(c.property_id);
+  const ligne=(k,v)=>`<div class="row"><div class="nm" style="color:var(--muted)">${k}</div><div style="margin-left:auto;font-weight:700;text-align:right">${v}</div></div>`;
+  $('tview-tcontract').innerHTML=`
+    <div class="sectit"><h2 class="dsp">Mon contrat</h2><button class="btn pri" onclick="pdfContrat('${c.id}')">📥 Mon bail (PDF)</button></div>
+    <div class="card"><div class="bd">
+      ${ligne('Logement',esc(p?p.name:'—'))}
+      ${ligne('Ville',esc(p?(p.city||'—'):'—'))}
+      ${ligne('Début',c.start_date||'—')}
+      ${ligne('Fin',c.end_date||'—')}
+      ${ligne('Loyer',fmt(c.rent_amount)+' FCFA / mois')}
+      ${ligne('Caution',fmt(c.deposit_amount)+' FCFA')}
+    </div></div>`;
+}
+
+function renderTenantPay(){
+  const l=state.payments,h='<div class="sectit"><h2 class="dsp">Mes paiements</h2></div>';
+  if(!l.length){$('tview-tpay').innerHTML=h+'<div class="empty"><div class="big">💳</div>Aucun paiement enregistré.</div>';return;}
+  $('tview-tpay').innerHTML=h+'<div class="tcard">'+l.map(p=>{const pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(p.type)} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.period||'')}</span></div><div class="meta">${esc(pr?pr.name:'')} · <b>${fmt(p.amount)} FCFA</b></div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${p.status==='paye'?`<button class="ibtn green" onclick="pdfRecu('${p.id}')" title="Quittance PDF">📥</button>`:''}</div></div>`;}).join('')+'</div>';
+}
+
+function renderTenantSin(){
+  const l=state.incidents;
+  let h='<div class="sectit"><h2 class="dsp">Mes sinistres</h2><button class="btn pri" id="tAddSinBtn">+ Déclarer un sinistre</button></div>';
+  if(!l.length)h+='<div class="empty"><div class="big">🛠️</div>Aucun sinistre déclaré. Tout va bien !</div>';
+  else h+='<div class="grid">'+l.map(sinCardHTML).join('')+'</div>';
+  $('tview-tsin').innerHTML=h;
+  if($('tAddSinBtn'))$('tAddSinBtn').onclick=openTenantSinModal;
+}
+function openTenantSinModal(){
+  if(!state.properties.length){toast('Aucun logement associé.');return;}
+  sinPhotoFile=null;$('sinPhotoPreview').innerHTML='';
+  $('s_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  show('sinModal');
+}
+
 /* ===== suppression générique ===== */
 async function delRow(table,id,label){if(!confirm('Supprimer ?'))return;const {error}=await sb.from(table).delete().eq('id',id);if(error){toast(error.message);return;}toast(label+' supprimé');await loadAll();}
 
 /* ===== PDF ===== */
+const bailleurLabel=()=>role==='owner'?((state.user&&state.user.email)||''):'Votre bailleur';
 function pdfHeader(doc){doc.setFillColor(10,74,46);doc.rect(0,0,210,26,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('ImmoGestion Cameroun',14,16);doc.setTextColor(20,36,32);doc.setFont('helvetica','normal');}
-function pdfRecu(id){const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);const titre=p.type==='loyer'?'QUITTANCE DE LOYER':'REÇU DE PAIEMENT';doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text(titre,14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+(p.paid_at||new Date().toISOString().slice(0,10)),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',state.user.email);line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant paye :',14,y);doc.setTextColor(14,107,64);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Recu genere par ImmoGestion. Signature du bailleur :',14,y);doc.line(150,y,196,y);doc.save(titre.toLowerCase().replace(/ /g,'_')+'.pdf');}
-function pdfContrat(id){const c=state.contracts.find(x=>x.id===id);const pr=prop(c.property_id),t=ten(c.tenant_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text('CONTRAT DE BAIL',14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');let y=56;const para=(txt)=>{const ls=doc.splitTextToSize(txt,182);doc.text(ls,14,y);y+=ls.length*6+3;};para('Entre les soussignes :');para('LE BAILLEUR : '+state.user.email);para('LE LOCATAIRE : '+(t?t.full_name:'—')+(t&&t.cni?' (CNI '+t.cni+')':'')+(t&&t.phone?', tel. '+t.phone:''));y+=2;doc.setFont('helvetica','bold');doc.text('Il a ete convenu ce qui suit :',14,y);y+=9;doc.setFont('helvetica','normal');para('Article 1 - Objet : Location du bien : '+(pr?pr.name:'—')+(pr&&pr.city?', situe a '+pr.city:'')+'.');para('Article 2 - Duree : du '+(c.start_date||'____')+' au '+(c.end_date||'____')+'.');para('Article 3 - Loyer : '+fmt(c.rent_amount)+' FCFA par mois, payable d\'avance.');para('Article 4 - Caution : '+fmt(c.deposit_amount)+' FCFA versee a la signature.');para('Article 5 - Le locataire entretient le bien et paie aux echeances convenues.');y+=8;doc.text('Fait le '+new Date().toISOString().slice(0,10),14,y);y+=18;doc.text('Le Bailleur',24,y);doc.text('Le Locataire',140,y);doc.line(14,y+16,70,y+16);doc.line(130,y+16,186,y+16);doc.save('contrat_bail.pdf');}
+function pdfRecu(id){const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);const titre=p.type==='loyer'?'QUITTANCE DE LOYER':'REÇU DE PAIEMENT';doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text(titre,14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+(p.paid_at||new Date().toISOString().slice(0,10)),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',bailleurLabel());line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant paye :',14,y);doc.setTextColor(14,107,64);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Recu genere par ImmoGestion. Signature du bailleur :',14,y);doc.line(150,y,196,y);doc.save(titre.toLowerCase().replace(/ /g,'_')+'.pdf');}
+function pdfContrat(id){const c=state.contracts.find(x=>x.id===id);const pr=prop(c.property_id),t=ten(c.tenant_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text('CONTRAT DE BAIL',14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');let y=56;const para=(txt)=>{const ls=doc.splitTextToSize(txt,182);doc.text(ls,14,y);y+=ls.length*6+3;};para('Entre les soussignes :');para('LE BAILLEUR : '+bailleurLabel());para('LE LOCATAIRE : '+(t?t.full_name:'—')+(t&&t.cni?' (CNI '+t.cni+')':'')+(t&&t.phone?', tel. '+t.phone:''));y+=2;doc.setFont('helvetica','bold');doc.text('Il a ete convenu ce qui suit :',14,y);y+=9;doc.setFont('helvetica','normal');para('Article 1 - Objet : Location du bien : '+(pr?pr.name:'—')+(pr&&pr.city?', situe a '+pr.city:'')+'.');para('Article 2 - Duree : du '+(c.start_date||'____')+' au '+(c.end_date||'____')+'.');para('Article 3 - Loyer : '+fmt(c.rent_amount)+' FCFA par mois, payable d\'avance.');para('Article 4 - Caution : '+fmt(c.deposit_amount)+' FCFA versee a la signature.');para('Article 5 - Le locataire entretient le bien et paie aux echeances convenues.');y+=8;doc.text('Fait le '+new Date().toISOString().slice(0,10),14,y);y+=18;doc.text('Le Bailleur',24,y);doc.text('Le Locataire',140,y);doc.line(14,y+16,70,y+16);doc.line(130,y+16,186,y+16);doc.save('contrat_bail.pdf');}
 
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.querySelectorAll('.ov').forEach(o=>o.classList.add('hidden')));
 document.querySelectorAll('.ov').forEach(o=>o.onclick=(e)=>{if(e.target===o)o.classList.add('hidden');});
