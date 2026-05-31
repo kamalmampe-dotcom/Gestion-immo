@@ -346,7 +346,7 @@ const PAY={paye:['green','Payé'],en_attente:['amber','En attente'],retard:['red
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
-let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null;
+let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all';
 const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[]};
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
@@ -395,29 +395,62 @@ document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.queryS
 
 /* ===== DASHBOARD with charts + insights ===== */
 function monthKey(d){const dt=new Date(d);return isNaN(dt)?null:dt.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});}
+function dashInPeriod(s){if(dashYear==='all'&&dashMonth==='all')return true;const d=new Date(s);if(isNaN(d))return false;if(dashYear!=='all'&&d.getFullYear()!==+dashYear)return false;if(dashMonth!=='all'&&d.getMonth()!==+dashMonth)return false;return true;}
+function setDashYear(v){dashYear=v;renderDash();}
+function setDashMonth(v){dashMonth=v;renderDash();}
+function exportExcel(){const rows=[];const csvCell=(v)=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};const push=(...c)=>rows.push(c.map(csvCell).join(';'));
+  const paidAll=state.payments.filter(p=>p.status==='paye'),encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
+  const dueAll=state.payments.filter(p=>p.status!=='paye').reduce((s,p)=>s+(p.amount||0),0);
+  const maintAll=state.incidents.reduce((s,i)=>s+(i.cost||0),0);
+  const occ=state.properties.filter(p=>p.status==='occupe').length,tot=state.properties.length||1;
+  push('ImmoGestion - Export du '+new Date().toLocaleDateString('fr-FR'));push('');
+  push('INDICATEURS');push('Revenus encaisses (FCFA)',encAll);push('Impayes (FCFA)',dueAll);push('Depenses maintenance (FCFA)',maintAll);push('Benefice net (FCFA)',encAll-maintAll);push('Taux occupation (%)',Math.round(occ/tot*100));push('Sinistres ouverts',state.incidents.filter(i=>i.status!=='cloture').length);push('Nombre de biens',state.properties.length);push('Loyers attendus / mois (FCFA)',state.contracts.reduce((s,c)=>s+(c.rent_amount||0),0));push('');
+  push('BIENS');push('Nom','Type','Ville','Loyer (FCFA)','Statut','Pieces','Surface (m2)');state.properties.forEach(p=>push(p.name,p.type,p.city,p.rent_amount,p.status,p.rooms,p.surface));push('');
+  push('LOCATAIRES');push('Nom','Telephone','Email','CNI');state.tenants.forEach(t=>push(t.full_name,t.phone,t.email,t.cni));push('');
+  push('PAIEMENTS');push('Locataire','Bien','Type','Montant (FCFA)','Statut','Periode','Paye le');state.payments.forEach(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id);push(t?t.full_name:'',pr?pr.name:'',p.type,p.amount,(PAY[p.status]||['','?'])[1],p.period,p.paid_at);});push('');
+  push('SINISTRES');push('Titre','Bien','Type','Priorite','Statut','Cout (FCFA)','Reparateur');state.incidents.forEach(i=>{const pr=prop(i.property_id);push(i.title,pr?pr.name:'',i.type,i.priority,i.status,i.cost,i.contractor);});
+  const csv='﻿'+rows.join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='immogestion_export_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('Export Excel telecharge ✓');}
 function renderDash(){
   const occ=state.properties.filter(p=>p.status==='occupe').length, vac=state.properties.filter(p=>p.status==='vacant').length, maint=state.properties.filter(p=>p.status==='maintenance').length, tot=state.properties.length||1;
-  const paid=state.payments.filter(p=>p.status==='paye'), encaisse=paid.reduce((s,p)=>s+(p.amount||0),0);
+  const paidAll=state.payments.filter(p=>p.status==='paye');
+  const paid=paidAll.filter(p=>dashInPeriod(p.paid_at||p.created_at)), encaisse=paid.reduce((s,p)=>s+(p.amount||0),0);
+  const encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
   const impayes=state.payments.filter(p=>p.status!=='paye'), dueImp=impayes.reduce((s,p)=>s+(p.amount||0),0);
-  const recouvr=encaisse+dueImp>0?Math.round(encaisse/(encaisse+dueImp)*100):100;
+  const recouvr=encAll+dueImp>0?Math.round(encAll/(encAll+dueImp)*100):100;
   const loyersAttendus=state.contracts.reduce((s,c)=>s+(c.rent_amount||0),0);
-  // top bien (par revenus encaissés)
-  const revByProp={}; paid.forEach(p=>{revByProp[p.property_id]=(revByProp[p.property_id]||0)+p.amount;});
+  const maintCost=state.incidents.filter(i=>dashInPeriod(i.created_at)).reduce((s,i)=>s+(i.cost||0),0), benefice=encaisse-maintCost;
+  const revByProp={}; paidAll.forEach(p=>{revByProp[p.property_id]=(revByProp[p.property_id]||0)+p.amount;});
   let topId=null,topV=0; Object.entries(revByProp).forEach(([k,v])=>{if(v>topV){topV=v;topId=k;}});
   const topBien=topId?prop(topId):null;
   const sinOuverts=state.incidents.filter(i=>i.status!=='cloture').length;
-  // revenue series (6 derniers mois)
   const series={}; const now=new Date();
   for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);series[d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'})]=0;}
-  paid.forEach(p=>{const k=monthKey(p.paid_at||p.created_at);if(k&&k in series)series[k]+=p.amount;});
+  paidAll.forEach(p=>{const k=monthKey(p.paid_at||p.created_at);if(k&&k in series)series[k]+=p.amount;});
 
+  const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const years=[...new Set(state.payments.map(p=>{const d=new Date(p.paid_at||p.created_at);return isNaN(d)?null:d.getFullYear();}).filter(Boolean))].sort((a,b)=>b-a);
+  const yearOpts=`<option value="all"${dashYear==='all'?' selected':''}>Toutes les années</option>`+years.map(y=>`<option value="${y}"${dashYear===String(y)?' selected':''}>${y}</option>`).join('');
+  const monthOpts=`<option value="all"${dashMonth==='all'?' selected':''}>Tous les mois</option>`+MONTHS.map((m,idx)=>`<option value="${idx}"${dashMonth===String(idx)?' selected':''}>${m}</option>`).join('');
+  const periodLabel=(dashYear==='all'&&dashMonth==='all')?"tout l'historique":((dashMonth!=='all'?MONTHS[+dashMonth]+' ':'')+(dashYear!=='all'?dashYear:'toutes années'));
   $('view-dash').innerHTML=`
     <div class="hero"><h2 class="dsp">Bonjour 👋</h2><p>Voici l'activité de votre patrimoine en un coup d'œil.</p></div>
+    <div class="sectit" style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="inp" style="width:auto;margin:0" onchange="setDashYear(this.value)">${yearOpts}</select>
+        <select class="inp" style="width:auto;margin:0" onchange="setDashMonth(this.value)">${monthOpts}</select>
+        <span class="smeta" style="color:var(--muted)">Période : ${periodLabel}</span>
+      </div>
+      <button class="btn gh" onclick="exportExcel()">📊 Exporter Excel</button>
+    </div>
     <div class="kpis stagger">
       <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">💰</div><div class="lbl">Revenus encaissés</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">📈 ${paid.length} paiement(s)</div></div>
       <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${fmt(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${impayes.length} en attente</div></div>
+      <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🔧</div><div class="lbl">Dépenses maintenance</div><div class="val dsp">${fmt(maintCost)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">réparations</div></div>
+      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📈</div><div class="lbl">Bénéfice net</div><div class="val dsp" style="color:${benefice>=0?'#10b981':'#ef4444'}">${fmt(benefice)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">encaissé − maintenance</div></div>
       <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${Math.round(occ/tot*100)}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${state.properties.length} biens</div></div>
+      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">📅</div><div class="lbl">Loyers attendus / mois</div><div class="val dsp">${fmt(loyersAttendus)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">${state.contracts.length} contrat(s)</div></div>
       <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
+      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">🏢</div><div class="lbl">Biens</div><div class="val dsp">${state.properties.length}</div><div class="tr" style="color:var(--muted)">${occ} occ · ${vac} vac</div></div>
     </div>
     <div class="charts">
       <div class="card"><div class="hd">Revenus encaissés <span class="mini">6 derniers mois</span></div><div class="bd"><div class="chartbox"><canvas id="cRev"></canvas></div></div></div>
@@ -429,10 +462,9 @@ function renderDash(){
       <div class="ins"><div class="spark">🏆</div><div class="tag">Bien le plus rentable</div><div class="big dsp" style="font-size:16px">${topBien?esc(topBien.name):'—'}</div><div class="d">${topBien?fmt(topV)+' FCFA encaissés':'Pas encore de données'}</div></div>
     </div>
     <div class="charts">
-      <div class="card"><div class="hd">Derniers paiements</div><div class="bd">${paid.length||impayes.length?state.payments.slice(0,5).map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;return `<div class="row"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||p.type)}</div></div><div style="margin-left:auto;text-align:right"><div class="dsp" style="font-weight:700;font-size:13px">${fmt(p.amount)}</div><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span></div></div>`;}).join(''):'<div class="empty" style="padding:22px">Aucun paiement.</div>'}</div></div>
+      <div class="card"><div class="hd">Derniers paiements</div><div class="bd">${state.payments.length?state.payments.slice(0,5).map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;return `<div class="row"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||p.type)}</div></div><div style="margin-left:auto;text-align:right"><div class="dsp" style="font-weight:700;font-size:13px">${fmt(p.amount)}</div><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span></div></div>`;}).join(''):'<div class="empty" style="padding:22px">Aucun paiement.</div>'}</div></div>
       <div class="card"><div class="hd">À relancer 🔔</div><div class="bd">${impayes.length?impayes.slice(0,5).map(p=>{const t=ten(p.tenant_id);return `<div class="row"><div class="av" style="background:var(--red-bg);color:var(--red)">⚠️</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${fmt(p.amount)} FCFA · ${esc(p.period||'')}</div></div>${t&&t.phone?`<button class="ibtn" style="margin-left:auto;color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}</div>`;}).join(''):'<div class="empty" style="padding:22px">🎉 Aucun impayé. Tout est à jour !</div>'}</div></div>
     </div>`;
-  // charts
   const labels=Object.keys(series), vals=Object.values(series);
   if(chRev)chRev.destroy(); if(chOcc)chOcc.destroy();
   const ctxR=$('cRev'); if(ctxR){const g=ctxR.getContext('2d').createLinearGradient(0,0,0,240);g.addColorStop(0,'rgba(37,99,235,.85)');g.addColorStop(1,'rgba(37,99,235,.15)');
