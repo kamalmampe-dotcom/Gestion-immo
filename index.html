@@ -189,8 +189,16 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
 
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;padding:13px 22px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:var(--sh-lg);z-index:60;max-width:90%}
 .stagger>*{animation:rise .4s cubic-bezier(.2,.8,.2,1) both}
-.stagger>*:nth-child(2){animation-delay:.05s}.stagger>*:nth-child(3){animation-delay:.1s}.stagger>*:nth-child(4){animation-delay:.15s}
+.stagger>*:nth-child(2){animation-delay:.05s}.stagger>*:nth-child(3){animation-delay:.1s}.stagger>*:nth-child(4){animation-delay:.15s}.stagger>*:nth-child(5){animation-delay:.2s}.stagger>*:nth-child(6){animation-delay:.25s}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* Smooth page transitions */
+.wrap{animation:pageIn .3s ease-out}
+@keyframes pageIn{from{opacity:.8;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Button ripple effect */
+.btn:active{animation:ripple .4s ease-out}
+@keyframes ripple{0%{transform:scale(1);opacity:1}100%{transform:scale(1.02);opacity:0}}
 @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}.insights{grid-template-columns:1fr}.frow{grid-template-columns:1fr}.topbar .email{display:none}.modal{max-width:95vw}}
 </style>
 </head>
@@ -395,10 +403,10 @@ function renderDash(){
   $('view-dash').innerHTML=`
     <div class="hero"><h2 class="dsp">Bonjour 👋</h2><p>Voici l'activité de votre patrimoine en un coup d'œil.</p></div>
     <div class="kpis stagger">
-      <div class="kpi"><div class="ic" style="background:var(--green-50);color:var(--green-700)">💰</div><div class="lbl">Revenus encaissés</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:var(--green-600)">📈 ${paid.length} paiement(s)</div></div>
-      <div class="kpi"><div class="ic" style="background:var(--red-bg);color:var(--red)">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${fmt(dueImp)} <small>FCFA</small></div><div class="tr" style="color:var(--red)">${impayes.length} en attente</div></div>
-      <div class="kpi"><div class="ic" style="background:var(--blue-bg);color:var(--blue)">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${Math.round(occ/tot*100)}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${state.properties.length} biens</div></div>
-      <div class="kpi"><div class="ic" style="background:var(--amber-bg);color:var(--amber)">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
+      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">💰</div><div class="lbl">Revenus encaissés</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">📈 ${paid.length} paiement(s)</div></div>
+      <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${fmt(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${impayes.length} en attente</div></div>
+      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${Math.round(occ/tot*100)}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${state.properties.length} biens</div></div>
+      <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
     </div>
     <div class="charts">
       <div class="card"><div class="hd">Revenus encaissés <span class="mini">6 derniers mois</span></div><div class="bd"><div class="chartbox"><canvas id="cRev"></canvas></div></div></div>
@@ -416,9 +424,9 @@ function renderDash(){
   // charts
   const labels=Object.keys(series), vals=Object.values(series);
   if(chRev)chRev.destroy(); if(chOcc)chOcc.destroy();
-  const ctxR=$('cRev'); if(ctxR){const g=ctxR.getContext('2d').createLinearGradient(0,0,0,210);g.addColorStop(0,'rgba(19,138,82,.85)');g.addColorStop(1,'rgba(19,138,82,.15)');
-    chRev=new Chart(ctxR,{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:g,borderRadius:8,maxBarThickness:38}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>fmt(c.parsed.y)+' FCFA'}}},scales:{y:{ticks:{callback:(v)=>v>=1000?(v/1000)+'k':v,color:'#8b988f',font:{size:10}},grid:{color:'#efebe1'}},x:{ticks:{color:'#8b988f',font:{size:11}},grid:{display:false}}}}});}
-  const ctxO=$('cOcc'); if(ctxO){chOcc=new Chart(ctxO,{type:'doughnut',data:{labels:['Occupé','Vacant','Maintenance'],datasets:[{data:[occ,vac,maint],backgroundColor:['#138a52','#e0a431','#2d6fb0'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'66%',plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11},color:'#5f6f68'}}}}});}
+  const ctxR=$('cRev'); if(ctxR){const g=ctxR.getContext('2d').createLinearGradient(0,0,0,240);g.addColorStop(0,'rgba(37,99,235,.85)');g.addColorStop(1,'rgba(37,99,235,.15)');
+    chRev=new Chart(ctxR,{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:g,borderRadius:8,maxBarThickness:42,borderColor:'rgba(37,99,235,.2)',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:12,titleFont:{size:13,weight:'bold'},bodyFont:{size:12},cornerRadius:8,displayColors:false,callbacks:{label:(c)=>fmt(c.parsed.y)+' FCFA'}}},scales:{y:{ticks:{callback:(v)=>v>=1000?(v/1000)+'k':v,color:'#9ca3af',font:{size:10,weight:'600'}},grid:{color:'#e5e7eb',drawBorder:false}},x:{ticks:{color:'#9ca3af',font:{size:11,weight:'600'}},grid:{display:false}}}}});}
+  const ctxO=$('cOcc'); if(ctxO){chOcc=new Chart(ctxO,{type:'doughnut',data:{labels:['Occupé','Vacant','Maintenance'],datasets:[{data:[occ,vac,maint],backgroundColor:['#10b981','#f59e0b','#2563eb'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11,weight:'600'},color:'#6b7280',padding:14}}},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:10,titleFont:{size:12,weight:'bold'},bodyFont:{size:11},cornerRadius:8,displayColors:false}}}});}
 }
 
 /* ===== BIENS ===== */
@@ -553,10 +561,10 @@ function renderTenantHome(){
     <div class="hero"><h2 class="dsp">Bonjour 👋</h2><p>Bienvenue dans votre espace locataire.</p></div>
     ${p?`<div class="grid" style="margin-bottom:16px"><div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b green st"><span class="d"></span>Mon logement</span></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type||'')}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`:'<div class="empty"><div class="big">🏠</div>Aucun logement associé pour le moment. Contactez votre bailleur.</div>'}
     <div class="kpis stagger">
-      <div class="kpi"><div class="ic" style="background:var(--green-50);color:var(--green-700)">🏠</div><div class="lbl">Loyer mensuel</div><div class="val dsp">${fmt(c?c.rent_amount:0)} <small>FCFA</small></div></div>
-      <div class="kpi"><div class="ic" style="background:var(--green-50);color:var(--green-700)">✅</div><div class="lbl">Total payé</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:var(--green-600)">${paid.length} paiement(s)</div></div>
-      <div class="kpi"><div class="ic" style="background:var(--red-bg);color:var(--red)">⚠️</div><div class="lbl">À régler</div><div class="val dsp">${fmt(dueAmt)} <small>FCFA</small></div><div class="tr" style="color:var(--red)">${due.length} en attente</div></div>
-      <div class="kpi"><div class="ic" style="background:var(--amber-bg);color:var(--amber)">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
+      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">🏠</div><div class="lbl">Loyer mensuel</div><div class="val dsp">${fmt(c?c.rent_amount:0)} <small>FCFA</small></div></div>
+      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">✅</div><div class="lbl">Total payé</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">${paid.length} paiement(s)</div></div>
+      <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">À régler</div><div class="val dsp">${fmt(dueAmt)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${due.length} en attente</div></div>
+      <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
     </div>`;
 }
 
