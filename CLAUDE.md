@@ -21,7 +21,7 @@ Application web de **gestion locative pour bailleurs au Cameroun**, que je veux 
 - **Pas de tirets cadratins (—)** dans les textes affichés.
 
 ## Design (déjà en place, à conserver)
-- Couleurs : vert émeraude (`--green-700 #0e6b40`) + or (`--gold-500 #e0a431`) sur fond papier (`--paper #f6f3ec`).
+- Couleurs : **bleu** (`--accent #2563eb`) + **marine** (`--primary #0f172a`) sur fond clair (`#f9fafb`). Vert = succès, rouge = alerte, orange = avertissement. (Thème bleu choisi le 2026-05-31, remplace l'ancien vert/or.)
 - Polices : **Bricolage Grotesque** (titres, classe `.dsp`) + **Plus Jakarta Sans** (texte).
 - Réutilise les variables CSS et classes existantes (`.btn`, `.card`, `.b`, `.modal`, etc.).
 

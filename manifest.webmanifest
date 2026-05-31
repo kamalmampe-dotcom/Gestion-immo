@@ -4,8 +4,8 @@
   "description": "Gestion locative pour bailleurs au Cameroun",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#06321f",
-  "theme_color": "#0e6b40",
+  "background_color": "#f9fafb",
+  "theme_color": "#2563eb",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
