@@ -143,6 +143,14 @@ button{cursor:pointer;font-family:inherit}
 .scard .sph .pr{position:absolute;top:10px;right:10px}
 .scard .sb{padding:16px}.scard .stt{font-weight:700;font-size:15px;color:var(--ink)}.scard .smeta{font-size:12px;color:var(--muted);margin-top:3px}
 .scard .sf{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+/* kanban */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:start}
+.kancol{background:var(--gray-50);border:1px solid var(--line);border-radius:14px;padding:10px}
+.kanhd{font-weight:700;font-size:13px;margin-bottom:10px;display:flex;align-items:center;gap:6px;color:var(--ink)}
+.kancount{background:var(--gray-200);color:var(--gray-700);border-radius:99px;padding:1px 8px;font-size:11px;margin-left:auto}
+.kanbody{display:flex;flex-direction:column;gap:10px}
+.kanmt{color:var(--faint);font-size:12px;text-align:center;padding:14px 0}
+@media(max-width:820px){.kanban{grid-template-columns:1fr 1fr}}
 
 /* timeline */
 .timeline{display:flex;align-items:flex-start;margin:8px 0 6px}
@@ -350,7 +358,7 @@ const PAY={paye:['green','Payé'],en_attente:['amber','En attente'],retard:['red
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
-let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null;
+let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list';
 const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[]};
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
@@ -541,7 +549,7 @@ function openEditBien(id){const p=prop(id);if(!p)return;editBienId=id;photoFile=
 /* ===== LOCATAIRES ===== */
 function renderLoc(){const l=state.tenants;
   if(!l.length){$('locList').innerHTML='<div class="empty"><div class="big">👥</div>Aucun locataire.</div>';return;}
-  $('locList').innerHTML='<div class="tcard">'+l.map(t=>`<div class="trow"><div class="av">${t.photo_url?`<img src="${esc(t.photo_url)}">`:initials(t.full_name)}</div><div><div class="nm">${esc(t.full_name)}</div><div class="meta">${esc(t.phone||'—')}${t.email?' · '+esc(t.email):''}${t.cni?' · CNI '+esc(t.cni):''}</div></div><div class="acts"><button class="ibtn" data-editloc="${t.id}" title="Modifier">✏️</button><button class="ibtn red" data-delloc="${t.id}">🗑️</button></div></div>`).join('')+'</div>';
+  $('locList').innerHTML='<div class="tcard">'+l.map(t=>`<div class="trow"><div class="av">${t.photo_url?`<img src="${esc(t.photo_url)}">`:initials(t.full_name)}</div><div><div class="nm">${esc(t.full_name)}</div><div class="meta">${esc(t.phone||'—')}${t.email?' · '+esc(t.email):''}${t.cni?' · CNI '+esc(t.cni):''}</div></div><div class="acts">${t.phone?`<button class="ibtn" style="color:#25D366" title="WhatsApp" onclick="waTenant('${t.id}')">💬</button>`:''}<button class="ibtn" data-editloc="${t.id}" title="Modifier">✏️</button><button class="ibtn red" data-delloc="${t.id}">🗑️</button></div></div>`).join('')+'</div>';
   document.querySelectorAll('[data-delloc]').forEach(b=>b.onclick=()=>delRow('tenants',b.dataset.delloc,'Locataire'));
   document.querySelectorAll('[data-editloc]').forEach(b=>b.onclick=()=>openEditLoc(b.dataset.editloc));
 }
@@ -581,15 +589,24 @@ function relanceWA(id){const p=state.payments.find(x=>x.id===id);const t=ten(p.t
 
 function relanceExpiration(id){const c=state.contracts.find(x=>x.id===id);if(!c)return;const t=ten(c.tenant_id),pr=prop(c.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, votre bail pour ${pr?pr.name:'votre logement'} arrive à échéance le ${c.end_date}. Merci de nous contacter pour le renouvellement. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
 function contractStatusBadge(c){if(!c.end_date)return '';const days=(new Date(c.end_date)-new Date())/86400000;if(days<0)return '<span class="b red"><span class="d"></span>Expiré</span>';if(days<=30)return '<span class="b amber"><span class="d"></span>Expire bientôt</span>';return '<span class="b green"><span class="d"></span>Actif</span>';}
+function waTenant(id){const t=ten(id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');window.open(`https://wa.me/${num}?text=${encodeURIComponent('Bonjour '+(t.full_name||'')+', ')}`,'_blank');}
+function waSinistre(id){const i=state.incidents.find(x=>x.id===id);if(!i)return;const t=ten(i.tenant_id),pr=prop(i.property_id);if(!t||!t.phone){toast('Pas de numéro pour ce locataire');return;}const num=t.phone.replace(/\D/g,'');const st=(SFLOW.find(s=>s[0]===i.status)||SFLOW[0])[1];const msg=`Bonjour ${t.full_name}, concernant le sinistre « ${i.title} »${pr?' au logement '+pr.name:''} : statut actuel « ${st} ». Nous vous tenons informé. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
 /* ===== SINISTRES ===== */
 function sinCardHTML(i){const k=SKIND[i.type]||SKIND.autre,pr=prop(i.property_id),pp=SPRIO[i.priority]||SPRIO.moyen,stIdx=SFLOW.findIndex(s=>s[0]===i.status),stLbl=(SFLOW[stIdx]||SFLOW[0])[1];
   return `<div class="scard" onclick="openSin('${i.id}')"><div class="sph">${i.photo_before?`<img src="${esc(i.photo_before)}">`:`<div class="noimg">${k[0]}</div>`}<span class="b ${pp[0]} pr"><span class="d"></span>${pp[1]}</span></div><div class="sb"><div class="stt">${k[0]} ${esc(i.title)}</div><div class="smeta">${esc(pr?pr.name:'—')} · ${i.created_at?i.created_at.slice(0,10):''}</div><div class="sf"><span class="b ${i.status==='cloture'?'green':'amber'}"><span class="d"></span>${stLbl}</span>${i.cost?`<span class="smeta">${fmt(i.cost)} FCFA</span>`:''}</div></div></div>`;}
 function renderSin(){
-  $('sinFilters').innerHTML=[['all','Tous'],...SFLOW].map(([k,l])=>`<button class="tab ${sinFilter===k?'on':''}" onclick="setSinFilter('${k}')">${l}</button>`).join('');
+  const toggle=`<button class="tab ${sinView==='list'?'on':''}" onclick="setSinView('list')">☰ Liste</button><button class="tab ${sinView==='kanban'?'on':''}" onclick="setSinView('kanban')">▦ Kanban</button>`;
+  if(sinView==='kanban'){
+    $('sinFilters').innerHTML=toggle;
+    $('sinList').innerHTML='<div class="kanban">'+SFLOW.map(([k,lbl])=>{const items=state.incidents.filter(i=>i.status===k);return `<div class="kancol"><div class="kanhd">${lbl} <span class="kancount">${items.length}</span></div><div class="kanbody">${items.length?items.map(sinCardHTML).join(''):'<div class="kanmt">Aucun</div>'}</div></div>`;}).join('')+'</div>';
+    return;
+  }
+  $('sinFilters').innerHTML=toggle+'<span style="display:inline-block;width:8px"></span>'+[['all','Tous'],...SFLOW].map(([k,l])=>`<button class="tab ${sinFilter===k?'on':''}" onclick="setSinFilter('${k}')">${l}</button>`).join('');
   let l=state.incidents; if(sinFilter!=='all')l=l.filter(i=>i.status===sinFilter);
   if(!l.length){$('sinList').innerHTML='<div class="empty"><div class="big">🛠️</div>Aucun sinistre dans cette catégorie.</div>';return;}
   $('sinList').innerHTML='<div class="grid">'+l.map(sinCardHTML).join('')+'</div>';
 }
+function setSinView(v){sinView=v;renderSin();}
 function setSinFilter(k){sinFilter=k;renderSin();}
 $('addSinBtn').onclick=()=>{if(!state.properties.length){toast('Ajoute d\'abord un bien.');return;}editSinId=null;sinPhotoFile=null;$('sinPhotoPreview').innerHTML='';$('s_desc').value='';$('s_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('sinModalTitle').textContent='Déclarer un sinistre';$('saveSin').textContent='Déclarer';show('sinModal');};
 $('sinphotobox').onclick=()=>$('s_photo').click();
@@ -623,7 +640,7 @@ function openSin(id){curSin=id;const i=state.incidents.find(x=>x.id===id);const 
   const cColor=(a)=>a&&a.toLowerCase().includes('locataire')?'#2d6fb0':(a&&a.toLowerCase().includes('répar')?'var(--gold-600)':'var(--green-700)');
   $('sd_body').innerHTML=`
     <div class="smeta" style="color:var(--muted);font-size:12.5px;margin-bottom:12px">${esc(pr?pr.name:'—')}${t&&isOwner?' · '+esc(t.full_name):''} · déclaré le ${i.created_at?i.created_at.slice(0,10):''}</div>
-    ${isOwner?`<button class="btn gh" style="margin-bottom:14px;padding:8px 14px;font-size:13px" onclick="openEditSin('${i.id}')">✏️ Modifier le sinistre</button>`:''}
+    ${isOwner?`<button class="btn gh" style="margin-bottom:14px;padding:8px 14px;font-size:13px" onclick="openEditSin('${i.id}')">✏️ Modifier</button>${t&&t.phone?` <button class="btn gh" style="margin-bottom:14px;padding:8px 14px;font-size:13px;color:#25D366" onclick="waSinistre('${i.id}')">💬 Prévenir le locataire</button>`:''}`:''}
     <div class="timeline">${SFLOW.map((s,idx)=>`<div class="step ${idx<stIdx?'done':idx===stIdx?'cur':''}"><div class="bar"></div><div class="dot">${idx<stIdx?'✓':idx+1}</div><div class="lbl">${s[1]}</div></div>`).join('')}</div>
     ${isOwner?(i.status!=='cloture'?`<button class="btn pri full" style="margin:10px 0 16px" onclick="advanceSin()">Faire avancer → ${SFLOW[Math.min(stIdx+1,3)][1]}</button>`:`<div class="b green" style="margin:8px 0 16px"><span class="d"></span>Sinistre clôturé</div>`):(i.status==='cloture'?`<div class="b green" style="margin:10px 0 16px"><span class="d"></span>Sinistre clôturé</div>`:`<div class="b amber" style="margin:10px 0 16px"><span class="d"></span>En cours de traitement</div>`)}
     <div class="photopair">
