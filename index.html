@@ -274,7 +274,7 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
 
 <!-- MODALE BIEN -->
 <div class="ov hidden" id="bienModal"><div class="modal">
-  <div class="mh"><h3 class="dsp">Ajouter un bien</h3><button data-close>×</button></div>
+  <div class="mh"><h3 class="dsp" id="bienModalTitle">Ajouter un bien</h3><button data-close>×</button></div>
   <div class="mb">
     <label class="lab">Photo du bien</label><div class="photobox" id="photobox">📷 Cliquez pour ajouter une photo<div id="photoPreview"></div></div><input id="b_photo" type="file" accept="image/*" class="hidden">
     <label class="lab">Nom du bien</label><input class="inp" id="b_name" placeholder="Ex : Villa Bonapriso">
@@ -286,7 +286,7 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
 
 <!-- MODALE LOCATAIRE -->
 <div class="ov hidden" id="locModal"><div class="modal">
-  <div class="mh"><h3 class="dsp">Ajouter un locataire</h3><button data-close>×</button></div>
+  <div class="mh"><h3 class="dsp" id="locModalTitle">Ajouter un locataire</h3><button data-close>×</button></div>
   <div class="mb">
     <label class="lab">Photo du locataire</label><div class="photobox" id="locphotobox">📷 Photo (optionnel)<div id="locPhotoPreview"></div></div><input id="l_photo" type="file" accept="image/*" class="hidden">
     <label class="lab">Nom complet</label><input class="inp" id="l_name" placeholder="Nom & prénom">
@@ -318,7 +318,7 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
 
 <!-- MODALE DÉCLARER SINISTRE -->
 <div class="ov hidden" id="sinModal"><div class="modal">
-  <div class="mh"><h3 class="dsp">Déclarer un sinistre</h3><button data-close>×</button></div>
+  <div class="mh"><h3 class="dsp" id="sinModalTitle">Déclarer un sinistre</h3><button data-close>×</button></div>
   <div class="mb">
     <label class="lab">Photo « avant » (état actuel)</label><div class="photobox" id="sinphotobox">📷 Ajouter une photo<div id="sinPhotoPreview"></div></div><input id="s_photo" type="file" accept="image/*" class="hidden">
     <label class="lab">Bien concerné</label><select class="inp" id="s_prop"></select>
@@ -346,7 +346,7 @@ const PAY={paye:['green','Payé'],en_attente:['amber','En attente'],retard:['red
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
-let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null;
+let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null;
 const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[]};
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
@@ -443,33 +443,39 @@ function renderDash(){
 /* ===== BIENS ===== */
 function renderBiens(){const l=state.properties;
   if(!l.length){$('biensList').innerHTML='<div class="empty"><div class="big">🏢</div>Aucun bien. Clique « Ajouter un bien ».</div>';return;}
-  $('biensList').innerHTML='<div class="grid">'+l.map(p=>{const st=STATUS[p.status]||STATUS.vacant;return `<div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b ${st[0]} st"><span class="d"></span>${st[1]}</span><button class="del" data-delbien="${p.id}">🗑️</button></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type)}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`;}).join('')+'</div>';
+  $('biensList').innerHTML='<div class="grid">'+l.map(p=>{const st=STATUS[p.status]||STATUS.vacant;return `<div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b ${st[0]} st"><span class="d"></span>${st[1]}</span><button class="del" data-editbien="${p.id}" title="Modifier" style="right:48px">✏️</button><button class="del" data-delbien="${p.id}">🗑️</button></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type)}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-delbien]').forEach(b=>b.onclick=()=>delRow('properties',b.dataset.delbien,'Bien'));
+  document.querySelectorAll('[data-editbien]').forEach(b=>b.onclick=()=>openEditBien(b.dataset.editbien));
 }
-$('addBienBtn').onclick=()=>{photoFile=null;$('photoPreview').innerHTML='';show('bienModal');};
+$('addBienBtn').onclick=()=>{editBienId=null;photoFile=null;$('photoPreview').innerHTML='';['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_status').value='vacant';$('bienModalTitle').textContent='Ajouter un bien';show('bienModal');};
 $('photobox').onclick=()=>$('b_photo').click();
 $('b_photo').onchange=(e)=>{photoFile=e.target.files[0];if(photoFile){const r=new FileReader();r.onload=()=>$('photoPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(photoFile);}};
 async function uploadPhoto(file){if(!file)return null;const path=state.user.id+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9.]/g,'_');const up=await sb.storage.from('photos').upload(path,file);if(up.error){toast('Photo non envoyée : '+up.error.message);return null;}return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;}
 $('saveBien').onclick=async()=>{const name=$('b_name').value.trim();if(!name){toast('Le nom est requis');return;}$('saveBien').disabled=true;
-  const photo_url=await uploadPhoto(photoFile);
-  const {error}=await sb.from('properties').insert({name,type:$('b_type').value,city:$('b_city').value.trim(),rent_amount:parseInt($('b_rent').value)||0,status:$('b_status').value,rooms:parseInt($('b_rooms').value)||null,surface:parseFloat($('b_surface').value)||null,photo_url});
+  const data={name,type:$('b_type').value,city:$('b_city').value.trim(),rent_amount:parseInt($('b_rent').value)||0,status:$('b_status').value,rooms:parseInt($('b_rooms').value)||null,surface:parseFloat($('b_surface').value)||null};
+  if(photoFile){const u=await uploadPhoto(photoFile);if(u)data.photo_url=u;}
+  const {error}=editBienId?await sb.from('properties').update(data).eq('id',editBienId):await sb.from('properties').insert(data);
   $('saveBien').disabled=false;if(error){toast('Erreur : '+error.message);return;}
-  ['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_photo').value='';hide('bienModal');toast('Bien ajouté ✓');await loadAll();};
+  ['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_photo').value='';hide('bienModal');toast(editBienId?'Bien modifié ✓':'Bien ajouté ✓');editBienId=null;await loadAll();};
+function openEditBien(id){const p=prop(id);if(!p)return;editBienId=id;photoFile=null;$('b_name').value=p.name||'';$('b_type').value=p.type||'Appartement';$('b_city').value=p.city||'';$('b_rent').value=p.rent_amount||'';$('b_status').value=p.status||'vacant';$('b_rooms').value=p.rooms||'';$('b_surface').value=p.surface||'';$('photoPreview').innerHTML=p.photo_url?`<img src="${esc(p.photo_url)}">`:'';$('bienModalTitle').textContent='Modifier le bien';show('bienModal');}
 
 /* ===== LOCATAIRES ===== */
 function renderLoc(){const l=state.tenants;
   if(!l.length){$('locList').innerHTML='<div class="empty"><div class="big">👥</div>Aucun locataire.</div>';return;}
-  $('locList').innerHTML='<div class="tcard">'+l.map(t=>`<div class="trow"><div class="av">${t.photo_url?`<img src="${esc(t.photo_url)}">`:initials(t.full_name)}</div><div><div class="nm">${esc(t.full_name)}</div><div class="meta">${esc(t.phone||'—')}${t.email?' · '+esc(t.email):''}${t.cni?' · CNI '+esc(t.cni):''}</div></div><div class="acts"><button class="ibtn red" data-delloc="${t.id}">🗑️</button></div></div>`).join('')+'</div>';
+  $('locList').innerHTML='<div class="tcard">'+l.map(t=>`<div class="trow"><div class="av">${t.photo_url?`<img src="${esc(t.photo_url)}">`:initials(t.full_name)}</div><div><div class="nm">${esc(t.full_name)}</div><div class="meta">${esc(t.phone||'—')}${t.email?' · '+esc(t.email):''}${t.cni?' · CNI '+esc(t.cni):''}</div></div><div class="acts"><button class="ibtn" data-editloc="${t.id}" title="Modifier">✏️</button><button class="ibtn red" data-delloc="${t.id}">🗑️</button></div></div>`).join('')+'</div>';
   document.querySelectorAll('[data-delloc]').forEach(b=>b.onclick=()=>delRow('tenants',b.dataset.delloc,'Locataire'));
+  document.querySelectorAll('[data-editloc]').forEach(b=>b.onclick=()=>openEditLoc(b.dataset.editloc));
 }
-$('addLocBtn').onclick=()=>{locPhotoFile=null;$('locPhotoPreview').innerHTML='';show('locModal');};
+$('addLocBtn').onclick=()=>{editLocId=null;locPhotoFile=null;$('locPhotoPreview').innerHTML='';['l_name','l_phone','l_cni','l_email'].forEach(i=>$(i).value='');$('locModalTitle').textContent='Ajouter un locataire';show('locModal');};
 $('locphotobox').onclick=()=>$('l_photo').click();
 $('l_photo').onchange=(e)=>{locPhotoFile=e.target.files[0];if(locPhotoFile){const r=new FileReader();r.onload=()=>$('locPhotoPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(locPhotoFile);}};
 $('saveLoc').onclick=async()=>{const full_name=$('l_name').value.trim();if(!full_name){toast('Le nom est requis');return;}$('saveLoc').disabled=true;
-  const photo_url=await uploadPhoto(locPhotoFile);
-  const {error}=await sb.from('tenants').insert({full_name,phone:$('l_phone').value.trim(),cni:$('l_cni').value.trim(),email:$('l_email').value.trim().toLowerCase(),photo_url});
+  const data={full_name,phone:$('l_phone').value.trim(),cni:$('l_cni').value.trim(),email:$('l_email').value.trim().toLowerCase()};
+  if(locPhotoFile){const u=await uploadPhoto(locPhotoFile);if(u)data.photo_url=u;}
+  const {error}=editLocId?await sb.from('tenants').update(data).eq('id',editLocId):await sb.from('tenants').insert(data);
   $('saveLoc').disabled=false;if(error){toast('Erreur : '+error.message);return;}
-  ['l_name','l_phone','l_cni','l_email'].forEach(i=>$(i).value='');$('l_photo').value='';hide('locModal');toast('Locataire ajouté ✓');await loadAll();};
+  ['l_name','l_phone','l_cni','l_email'].forEach(i=>$(i).value='');$('l_photo').value='';hide('locModal');toast(editLocId?'Locataire modifié ✓':'Locataire ajouté ✓');editLocId=null;await loadAll();};
+function openEditLoc(id){const t=ten(id);if(!t)return;editLocId=id;locPhotoFile=null;$('l_name').value=t.full_name||'';$('l_phone').value=t.phone||'';$('l_cni').value=t.cni||'';$('l_email').value=t.email||'';$('locPhotoPreview').innerHTML=t.photo_url?`<img src="${esc(t.photo_url)}">`:'';$('locModalTitle').textContent='Modifier le locataire';show('locModal');}
 
 /* ===== CONTRATS ===== */
 function renderContrats(){const l=state.contracts;
@@ -485,7 +491,7 @@ $('saveContrat').onclick=async()=>{$('saveContrat').disabled=true;const {error}=
 /* ===== PAIEMENTS ===== */
 function renderPay(){const l=state.payments;
   if(!l.length){$('payList').innerHTML='<div class="empty"><div class="big">💳</div>Aucun paiement.</div>';return;}
-  $('payList').innerHTML='<div class="tcard">'+l.map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;const rel=p.status!=='paye'&&t&&t.phone;return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.type)}</span></div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||'')} · <b>${fmt(p.amount)} FCFA</b></div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${p.status==='paye'?`<button class="ibtn green" data-pdfr="${p.id}" title="Quittance PDF">📥</button>`:''}${rel?`<button class="ibtn" style="color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}<button class="ibtn red" data-delp="${p.id}">🗑️</button></div></div>`;}).join('')+'</div>';
+  $('payList').innerHTML='<div class="tcard">'+l.map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;const rel=p.status!=='paye'&&t&&t.phone;return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.type)}</span></div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||'')} · <b>${fmt(p.amount)} FCFA</b></div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${p.status==='paye'?`<button class="ibtn green" data-pdfr="${p.id}" title="Quittance PDF">📥</button>`:`<button class="ibtn" title="Facture PDF" onclick="pdfFacture('${p.id}')">📄</button>`}${rel?`<button class="ibtn" style="color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}<button class="ibtn red" data-delp="${p.id}">🗑️</button></div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-pdfr]').forEach(b=>b.onclick=()=>pdfRecu(b.dataset.pdfr));
   document.querySelectorAll('[data-delp]').forEach(b=>b.onclick=()=>delRow('payments',b.dataset.delp,'Paiement'));
 }
@@ -504,21 +510,30 @@ function renderSin(){
   $('sinList').innerHTML='<div class="grid">'+l.map(sinCardHTML).join('')+'</div>';
 }
 function setSinFilter(k){sinFilter=k;renderSin();}
-$('addSinBtn').onclick=()=>{if(!state.properties.length){toast('Ajoute d\'abord un bien.');return;}sinPhotoFile=null;$('sinPhotoPreview').innerHTML='';$('s_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');show('sinModal');};
+$('addSinBtn').onclick=()=>{if(!state.properties.length){toast('Ajoute d\'abord un bien.');return;}editSinId=null;sinPhotoFile=null;$('sinPhotoPreview').innerHTML='';$('s_desc').value='';$('s_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('sinModalTitle').textContent='Déclarer un sinistre';$('saveSin').textContent='Déclarer';show('sinModal');};
 $('sinphotobox').onclick=()=>$('s_photo').click();
 $('s_photo').onchange=(e)=>{sinPhotoFile=e.target.files[0];if(sinPhotoFile){const r=new FileReader();r.onload=()=>$('sinPhotoPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(sinPhotoFile);}};
 $('saveSin').onclick=async()=>{const desc=$('s_desc').value.trim();if(!desc){toast('Décris le sinistre');return;}$('saveSin').disabled=true;
-  const photo_before=await uploadPhoto(sinPhotoFile);
   const title=desc.length>40?desc.slice(0,40)+'…':desc;
+  let photo_before;if(sinPhotoFile)photo_before=await uploadPhoto(sinPhotoFile);
+  if(editSinId){
+    const upd={property_id:$('s_prop').value,type:$('s_type').value,priority:$('s_priority').value,description:desc,title};
+    if(photo_before)upd.photo_before=photo_before;
+    const {error}=await sb.from('incidents').update(upd).eq('id',editSinId);
+    $('saveSin').disabled=false;if(error){toast('Erreur : '+error.message);return;}
+    $('s_desc').value='';$('s_photo').value='';hide('sinModal');toast('Sinistre modifié ✓');editSinId=null;
+    if(role==='tenant')await loadTenant();else{await loadAll();$('sinFilters')&&setSinFilter('all');}return;
+  }
   const author=role==='tenant'?'Locataire':'Bailleur';
   let tenant_id;
   if(role==='tenant')tenant_id=myTenant.id;
   else{const c=state.contracts.find(x=>x.property_id===$('s_prop').value);tenant_id=c?c.tenant_id:null;}
   const cmt=[{author,text:desc,date:new Date().toISOString().slice(0,10)}];
-  const {error}=await sb.from('incidents').insert({property_id:$('s_prop').value,tenant_id,title,description:desc,type:$('s_type').value,priority:$('s_priority').value,status:'declare',photo_before,comments:cmt});
+  const {error}=await sb.from('incidents').insert({property_id:$('s_prop').value,tenant_id,title,description:desc,type:$('s_type').value,priority:$('s_priority').value,status:'declare',photo_before:photo_before||null,comments:cmt});
   $('saveSin').disabled=false;if(error){toast('Erreur : '+error.message);return;}
   $('s_desc').value='';$('s_photo').value='';hide('sinModal');toast('Sinistre déclaré ✓');
   if(role==='tenant')await loadTenant();else{await loadAll();$('sinFilters')&&setSinFilter('all');}};
+function openEditSin(id){const i=state.incidents.find(x=>x.id===id);if(!i)return;editSinId=id;sinPhotoFile=null;$('s_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('s_prop').value=i.property_id||'';$('s_type').value=i.type||'autre';$('s_priority').value=i.priority||'moyen';$('s_desc').value=i.description||'';$('sinPhotoPreview').innerHTML=i.photo_before?`<img src="${esc(i.photo_before)}">`:'';$('sinModalTitle').textContent='Modifier le sinistre';$('saveSin').textContent='Enregistrer';hide('sinDetail');show('sinModal');}
 let curSin=null;
 function openSin(id){curSin=id;const i=state.incidents.find(x=>x.id===id);const k=SKIND[i.type]||SKIND.autre,pr=prop(i.property_id),t=ten(i.tenant_id),stIdx=SFLOW.findIndex(s=>s[0]===i.status);
   const isOwner=role==='owner';
@@ -527,6 +542,7 @@ function openSin(id){curSin=id;const i=state.incidents.find(x=>x.id===id);const 
   const cColor=(a)=>a&&a.toLowerCase().includes('locataire')?'#2d6fb0':(a&&a.toLowerCase().includes('répar')?'var(--gold-600)':'var(--green-700)');
   $('sd_body').innerHTML=`
     <div class="smeta" style="color:var(--muted);font-size:12.5px;margin-bottom:12px">${esc(pr?pr.name:'—')}${t&&isOwner?' · '+esc(t.full_name):''} · déclaré le ${i.created_at?i.created_at.slice(0,10):''}</div>
+    ${isOwner?`<button class="btn gh" style="margin-bottom:14px;padding:8px 14px;font-size:13px" onclick="openEditSin('${i.id}')">✏️ Modifier le sinistre</button>`:''}
     <div class="timeline">${SFLOW.map((s,idx)=>`<div class="step ${idx<stIdx?'done':idx===stIdx?'cur':''}"><div class="bar"></div><div class="dot">${idx<stIdx?'✓':idx+1}</div><div class="lbl">${s[1]}</div></div>`).join('')}</div>
     ${isOwner?(i.status!=='cloture'?`<button class="btn pri full" style="margin:10px 0 16px" onclick="advanceSin()">Faire avancer → ${SFLOW[Math.min(stIdx+1,3)][1]}</button>`:`<div class="b green" style="margin:8px 0 16px"><span class="d"></span>Sinistre clôturé</div>`):(i.status==='cloture'?`<div class="b green" style="margin:10px 0 16px"><span class="d"></span>Sinistre clôturé</div>`:`<div class="b amber" style="margin:10px 0 16px"><span class="d"></span>En cours de traitement</div>`)}
     <div class="photopair">
@@ -632,6 +648,7 @@ function ensureJsPDF(){
 const bailleurLabel=()=>role==='owner'?((state.user&&state.user.email)||''):'Votre bailleur';
 function pdfHeader(doc){doc.setFillColor(15,23,42);doc.rect(0,0,210,26,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('ImmoGestion Cameroun',14,16);doc.setTextColor(20,36,32);doc.setFont('helvetica','normal');}
 async function pdfRecu(id){if(!await ensureJsPDF()){toast('PDF indisponible (connexion ?)');return;}const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);const titre=p.type==='loyer'?'QUITTANCE DE LOYER':'REÇU DE PAIEMENT';doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text(titre,14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+(p.paid_at||new Date().toISOString().slice(0,10)),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',bailleurLabel());line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant paye :',14,y);doc.setTextColor(14,107,64);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Recu genere par ImmoGestion. Signature du bailleur :',14,y);doc.line(150,y,196,y);doc.save(titre.toLowerCase().replace(/ /g,'_')+'.pdf');}
+async function pdfFacture(id){if(!await ensureJsPDF()){toast('PDF indisponible (connexion ?)');return;}const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text('FACTURE',14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+new Date().toISOString().slice(0,10),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',bailleurLabel());line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');line('Statut :',(PAY[p.status]||PAY.paye)[1]);doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant du :',14,y);doc.setTextColor(194,69,58);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Merci de regler avant l echeance. ImmoGestion.',14,y);doc.save('facture_'+p.id.slice(0,8)+'.pdf');}
 async function pdfContrat(id){if(!await ensureJsPDF()){toast('PDF indisponible (connexion ?)');return;}const c=state.contracts.find(x=>x.id===id);const pr=prop(c.property_id),t=ten(c.tenant_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text('CONTRAT DE BAIL',14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');let y=56;const para=(txt)=>{const ls=doc.splitTextToSize(txt,182);doc.text(ls,14,y);y+=ls.length*6+3;};para('Entre les soussignes :');para('LE BAILLEUR : '+bailleurLabel());para('LE LOCATAIRE : '+(t?t.full_name:'—')+(t&&t.cni?' (CNI '+t.cni+')':'')+(t&&t.phone?', tel. '+t.phone:''));y+=2;doc.setFont('helvetica','bold');doc.text('Il a ete convenu ce qui suit :',14,y);y+=9;doc.setFont('helvetica','normal');para('Article 1 - Objet : Location du bien : '+(pr?pr.name:'—')+(pr&&pr.city?', situe a '+pr.city:'')+'.');para('Article 2 - Duree : du '+(c.start_date||'____')+' au '+(c.end_date||'____')+'.');para('Article 3 - Loyer : '+fmt(c.rent_amount)+' FCFA par mois, payable d\'avance.');para('Article 4 - Caution : '+fmt(c.deposit_amount)+' FCFA versee a la signature.');para('Article 5 - Le locataire entretient le bien et paie aux echeances convenues.');y+=8;doc.text('Fait le '+new Date().toISOString().slice(0,10),14,y);y+=18;doc.text('Le Bailleur',24,y);doc.text('Le Locataire',140,y);doc.line(14,y+16,70,y+16);doc.line(130,y+16,186,y+16);doc.save('contrat_bail.pdf');}
 
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.querySelectorAll('.ov').forEach(o=>o.classList.add('hidden')));
