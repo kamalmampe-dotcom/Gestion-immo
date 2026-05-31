@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ImmoGestion Cameroun</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     Connexion à ta base de données Supabase (chargée depuis internet)
+     ════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --green-900:#06321f;--green-800:#0a4a2e;--green-700:#0e6b40;--green-600:#138a52;
+  --green-100:#dcefe4;--green-50:#eef7f1;--gold-500:#e0a431;--gold-600:#c98a1f;--gold-100:#f9eccf;
+  --ink:#162420;--muted:#5f6f68;--faint:#8b988f;--paper:#f6f3ec;--surface:#fff;
+  --line:#e7e2d6;--line-soft:#efebe1;--red:#c2453a;--red-bg:#fbe9e7;--blue:#2d6fb0;--blue-bg:#e6effa;--amber:#d4901f;--amber-bg:#fbf0d8;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+.dsp{font-family:'Bricolage Grotesque','Plus Jakarta Sans',sans-serif;letter-spacing:-.02em}
+body{background:radial-gradient(1200px 500px at 85% -10%,#fbf6ea,transparent 55%),radial-gradient(900px 600px at -10% 110%,#eef6ef,transparent 50%),var(--paper);color:var(--ink);min-height:100vh}
+.hidden{display:none!important}
+button{cursor:pointer;font-family:inherit}
+
+/* ---- setup notice ---- */
+#setup{max-width:560px;margin:60px auto;background:#fff;border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:0 10px 40px rgba(8,50,31,.1)}
+#setup h2{font-size:20px;margin-bottom:10px}
+#setup p{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:10px}
+#setup code{background:var(--green-50);padding:2px 7px;border-radius:6px;font-size:13px;color:var(--green-800)}
+
+/* ---- auth ---- */
+#auth{min-height:100vh;display:grid;place-items:center;padding:20px}
+.authcard{width:100%;max-width:380px;background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:0 18px 50px rgba(8,50,31,.14);padding:32px}
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:24px}
+.brand .mk{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--green-600),var(--gold-500));display:grid;place-items:center;color:#fff;font-size:22px}
+.brand b{font-size:18px;font-weight:700}.brand span{font-size:10.5px;color:var(--gold-600);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.authcard h1{font-size:24px;font-weight:700;margin-bottom:4px}
+.authcard .sub{font-size:13.5px;color:var(--muted);margin-bottom:20px}
+.fld{margin-bottom:14px}
+.fld label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+.fld input{width:100%;border:1px solid var(--line);border-radius:11px;padding:12px;font-size:14px;background:#fff}
+.fld input:focus{outline:0;border-color:var(--green-600);box-shadow:0 0 0 3px var(--green-50)}
+.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:.15s;width:100%}
+.btn.pri{background:var(--green-700);color:#fff}.btn.pri:hover{background:var(--green-800)}
+.btn.gh{background:#fff;border:1px solid var(--line);color:var(--ink);width:auto;padding:9px 14px;font-size:12.5px}
+.btn:disabled{opacity:.55;cursor:default}
+.switch{text-align:center;font-size:13px;color:var(--muted);margin-top:16px}
+.switch a{color:var(--green-700);font-weight:700;cursor:pointer}
+.msg{font-size:12.5px;font-weight:600;padding:10px 12px;border-radius:10px;margin-bottom:14px}
+.msg.err{background:var(--red-bg);color:var(--red)}.msg.ok{background:var(--green-100);color:var(--green-800)}
+
+/* ---- app shell ---- */
+#app{min-height:100vh;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:14px;padding:14px 20px;background:#fff;border-bottom:1px solid var(--line-soft);position:sticky;top:0;z-index:10}
+.topbar .mk{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--green-600),var(--gold-500));display:grid;place-items:center;color:#fff;font-size:18px}
+.topbar .name{font-weight:700;font-size:15px}.topbar .name span{display:block;font-size:10px;color:var(--gold-600);text-transform:uppercase;letter-spacing:.05em}
+.topbar .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.topbar .email{font-size:12.5px;color:var(--muted);font-weight:600}
+.tabs{display:flex;gap:6px;padding:14px 20px 0;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;border-radius:99px;padding:9px 16px;font-size:13px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:7px}
+.tab.on{background:var(--green-700);color:#fff;border-color:var(--green-700)}
+.tab.soon{opacity:.5;cursor:not-allowed}
+.tab .pill{background:var(--gold-100);color:var(--gold-600);font-size:9.5px;padding:1px 6px;border-radius:99px}
+.wrap{padding:20px;max-width:1100px;width:100%;margin:0 auto}
+.sectit{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.sectit h2{font-size:20px;font-weight:700}
+.btn.add{background:var(--green-700);color:#fff;width:auto;padding:10px 16px}
+
+/* biens grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.pcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;position:relative;transition:.15s}
+.pcard:hover{box-shadow:0 8px 24px rgba(12,60,40,.1);transform:translateY(-2px)}
+.pcard .top{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.pcard .tic{width:42px;height:42px;border-radius:12px;background:var(--green-50);color:var(--green-700);display:grid;place-items:center;flex-shrink:0;font-size:20px}
+.pcard .pt{font-weight:700;font-size:14.5px;line-height:1.3}
+.pcard .pc{font-size:12px;color:var(--muted);margin-top:2px}
+.pcard .del{position:absolute;top:12px;right:12px;border:0;background:var(--paper);width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--red);font-size:15px}
+.b{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px}
+.b .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+.b.green{background:var(--green-100);color:var(--green-800)}.b.amber{background:var(--amber-bg);color:var(--amber)}.b.blue{background:var(--blue-bg);color:var(--blue)}
+.pcard .foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}
+.pcard .price{font-weight:700;font-size:15px}.pcard .price small{color:var(--faint);font-weight:600}
+
+/* tenant rows */
+.tcard{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.trow{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+.trow:last-child{border-bottom:0}
+.trow .av{width:42px;height:42px;border-radius:50%;background:var(--green-700);color:#fff;display:grid;place-items:center;font-weight:700;flex-shrink:0}
+.trow .nm{font-weight:700;font-size:14px}.trow .meta{font-size:12px;color:var(--muted)}
+.trow .del{margin-left:auto;border:0;background:var(--paper);width:32px;height:32px;border-radius:9px;color:var(--red);font-size:15px;display:grid;place-items:center;flex-shrink:0}
+
+.empty{text-align:center;padding:50px 20px;color:var(--faint)}
+.empty .big{font-size:40px;margin-bottom:10px}
+.loading{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(6,50,31,.45);backdrop-filter:blur(3px);display:grid;place-items:center;padding:20px;z-index:50}
+.modal{background:#fff;border-radius:22px;width:100%;max-width:460px;box-shadow:0 30px 80px rgba(8,50,31,.3)}
+.modal .mh{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line-soft)}
+.modal .mh h3{font-size:17px;font-weight:700}
+.modal .mh button{border:0;background:var(--paper);width:34px;height:34px;border-radius:10px;font-size:18px;color:var(--muted)}
+.modal .mb{padding:20px 22px}
+.modal .mf{padding:14px 22px;border-top:1px solid var(--line-soft);display:flex;justify-content:flex-end}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+select.inp,input.inp{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px;font-size:14px;background:#fff;margin-bottom:12px}
+select.inp:focus,input.inp:focus{outline:0;border-color:var(--green-600);box-shadow:0 0 0 3px var(--green-50)}
+label.lab{display:block;font-size:12px;font-weight:700;margin-bottom:5px}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green-900);color:#fff;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.25);z-index:60}
+@media(max-width:600px){.frow{grid-template-columns:1fr}.topbar .email{display:none}}
+</style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  ⬇️⬇️⬇️  À REMPLACER PAR TES 2 CLÉS SUPABASE  ⬇️⬇️⬇️         ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+<script>
+  const SUPABASE_URL      = "https://luybjozosvmdlsiufsbl.supabase.co";   // ⬅️ colle ici "Project URL"
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1eWJqb3pvc3ZtZGxzaXVmc2JsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjA2MzEsImV4cCI6MjA5NTc5NjYzMX0.h4narCwaWshE_t9bq3ApMRuSTaQSeKnpHnP0kApud4c";            // ⬅️ colle ici la clé "anon public"
+</script>
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  ⬆️⬆️⬆️  NE TOUCHE À RIEN D'AUTRE EN DESSOUS  ⬆️⬆️⬆️          ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+
+<!-- Écran "il faut configurer les clés" -->
+<div id="setup" class="hidden">
+  <h2 class="dsp">⚙️ Presque prêt !</h2>
+  <p>Tu dois d'abord coller tes 2 clés Supabase dans ce fichier (tout en haut), là où c'est marqué <code>À REMPLACER</code>.</p>
+  <p>Suis le <b>Guide d'installation</b> (Phase A et B). Une fois les clés collées, recharge cette page.</p>
+</div>
+
+<!-- ═══════════════ ÉCRAN DE CONNEXION ═══════════════ -->
+<div id="auth" class="hidden">
+  <div class="authcard">
+    <div class="brand"><span class="mk">🏠</span><div><b class="dsp">ImmoGestion</b><br><span>Cameroun</span></div></div>
+    <h1 class="dsp" id="authTitle">Connexion</h1>
+    <p class="sub" id="authSub">Accédez à votre espace de gestion.</p>
+    <div id="authMsg"></div>
+    <div class="fld"><label>Email</label><input id="email" type="email" placeholder="vous@exemple.cm"></div>
+    <div class="fld"><label>Mot de passe</label><input id="password" type="password" placeholder="••••••••"></div>
+    <button class="btn pri" id="authBtn">Se connecter</button>
+    <div class="switch" id="authSwitch">Pas encore de compte ? <a id="toSignup">Créer un compte</a></div>
+  </div>
+</div>
+
+<!-- ═══════════════ APPLICATION ═══════════════ -->
+<div id="app" class="hidden">
+  <div class="topbar">
+    <span class="mk">🏠</span>
+    <div class="name">ImmoGestion<span>Cameroun</span></div>
+    <div class="right">
+      <span class="email" id="userEmail"></span>
+      <button class="btn gh" id="logoutBtn">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-view="biens">🏢 Mes biens</button>
+    <button class="tab" data-view="locataires">👥 Locataires</button>
+    <button class="tab soon">💳 Paiements <span class="pill">bientôt</span></button>
+    <button class="tab soon">📄 Contrats <span class="pill">bientôt</span></button>
+  </div>
+
+  <!-- BIENS -->
+  <div class="wrap" id="view-biens">
+    <div class="sectit">
+      <h2 class="dsp">Mes biens immobiliers</h2>
+      <button class="btn add" id="addBienBtn">+ Ajouter un bien</button>
+    </div>
+    <div id="biensList"><div class="loading">Chargement…</div></div>
+  </div>
+
+  <!-- LOCATAIRES -->
+  <div class="wrap hidden" id="view-locataires">
+    <div class="sectit">
+      <h2 class="dsp">Mes locataires</h2>
+      <button class="btn add" id="addLocBtn">+ Ajouter un locataire</button>
+    </div>
+    <div id="locList"><div class="loading">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- MODALE BIEN -->
+<div class="ov hidden" id="bienModal">
+  <div class="modal">
+    <div class="mh"><h3 class="dsp">Ajouter un bien</h3><button data-close>×</button></div>
+    <div class="mb">
+      <label class="lab">Nom du bien</label>
+      <input class="inp" id="b_name" placeholder="Ex : Villa Bonapriso">
+      <div class="frow">
+        <div><label class="lab">Type</label>
+          <select class="inp" id="b_type"><option>Appartement</option><option>Maison</option><option>Boutique</option><option>Bureau</option><option>Immeuble</option></select></div>
+        <div><label class="lab">Ville / quartier</label><input class="inp" id="b_city" placeholder="Douala, Bonapriso"></div>
+      </div>
+      <div class="frow">
+        <div><label class="lab">Loyer (FCFA/mois)</label><input class="inp" id="b_rent" type="number" placeholder="450000"></div>
+        <div><label class="lab">Statut</label>
+          <select class="inp" id="b_status"><option value="vacant">Vacant</option><option value="occupe">Occupé</option><option value="maintenance">Maintenance</option></select></div>
+      </div>
+      <div class="frow">
+        <div><label class="lab">Pièces</label><input class="inp" id="b_rooms" type="number" placeholder="4"></div>
+        <div><label class="lab">Surface (m²)</label><input class="inp" id="b_surface" type="number" placeholder="120"></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn pri" id="saveBien" style="width:auto;padding:11px 20px">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- MODALE LOCATAIRE -->
+<div class="ov hidden" id="locModal">
+  <div class="modal">
+    <div class="mh"><h3 class="dsp">Ajouter un locataire</h3><button data-close>×</button></div>
+    <div class="mb">
+      <label class="lab">Nom complet</label><input class="inp" id="l_name" placeholder="Nom & prénom">
+      <div class="frow">
+        <div><label class="lab">Téléphone</label><input class="inp" id="l_phone" placeholder="+237 6.. .. .. .."></div>
+        <div><label class="lab">N° CNI</label><input class="inp" id="l_cni" placeholder="Carte d'identité"></div>
+      </div>
+      <label class="lab">Email (optionnel)</label><input class="inp" id="l_email" placeholder="email@exemple.cm">
+    </div>
+    <div class="mf"><button class="btn pri" id="saveLoc" style="width:auto;padding:11px 20px">Enregistrer</button></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ImmoGestion Cameroun — Étape 1
+   Connexion + Biens + Locataires (base de données Supabase)
+   ============================================================ */
+
+const fmt = (n) => (Number(n) || 0).toLocaleString('fr-FR');
+const TYPE_ICON = { Appartement:'🏢', Maison:'🏡', Boutique:'🏪', Bureau:'🏬', Immeuble:'🏘️' };
+const STATUS = { occupe:['green','Occupé'], vacant:['amber','Vacant'], maintenance:['blue','Maintenance'] };
+const show = (id) => document.getElementById(id).classList.remove('hidden');
+const hide = (id) => document.getElementById(id).classList.add('hidden');
+const $ = (id) => document.getElementById(id);
+
+let sb = null;
+let isSignup = false;
+
+function toast(t){ const e=document.createElement('div'); e.className='toast'; e.textContent=t; document.body.appendChild(e); setTimeout(()=>e.remove(),2400); }
+
+/* ---------- Démarrage ---------- */
+function init(){
+  if (SUPABASE_URL.includes('VOTRE-PROJET') || SUPABASE_ANON_KEY.includes('VOTRE-CLE')) {
+    show('setup'); return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session) openApp(data.session.user); else show('auth');
+  });
+  sb.auth.onAuthStateChange((_e, session) => {
+    if (session) openApp(session.user);
+  });
+}
+
+/* ---------- Authentification ---------- */
+function setAuthMsg(text, kind){ $('authMsg').innerHTML = text ? `<div class="msg ${kind}">${text}</div>` : ''; }
+
+function toggleAuthMode(){
+  isSignup = !isSignup;
+  $('authTitle').textContent = isSignup ? 'Créer un compte' : 'Connexion';
+  $('authSub').textContent = isSignup ? 'Quelques secondes, et c\'est parti.' : 'Accédez à votre espace de gestion.';
+  $('authBtn').textContent = isSignup ? 'Créer mon compte' : 'Se connecter';
+  $('authSwitch').innerHTML = isSignup ? 'Déjà un compte ? <a id="toSignup">Se connecter</a>' : 'Pas encore de compte ? <a id="toSignup">Créer un compte</a>';
+  document.getElementById('toSignup').onclick = toggleAuthMode; // re-lier le nouveau lien
+  setAuthMsg('');
+}
+document.getElementById('toSignup').onclick = toggleAuthMode;
+
+$('authBtn').onclick = async () => {
+  const email = $('email').value.trim();
+  const password = $('password').value;
+  if (!email || !password) { setAuthMsg('Email et mot de passe requis.', 'err'); return; }
+  $('authBtn').disabled = true; setAuthMsg('');
+  try {
+    if (isSignup) {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      if (!data.session) { setAuthMsg('Compte créé. Si la connexion ne s\'ouvre pas, vérifie que la confirmation par email est désactivée (Guide, Phase A).', 'ok'); }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    }
+  } catch (e) {
+    setAuthMsg(traduire(e.message), 'err');
+  } finally { $('authBtn').disabled = false; }
+};
+
+function traduire(m){
+  if (/Invalid login/i.test(m)) return 'Email ou mot de passe incorrect.';
+  if (/already registered/i.test(m)) return 'Cet email a déjà un compte. Connecte-toi.';
+  if (/at least 6/i.test(m)) return 'Le mot de passe doit faire au moins 6 caractères.';
+  return m;
+}
+
+$('logoutBtn').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+/* ---------- Ouvrir l'app ---------- */
+function openApp(user){
+  hide('auth'); hide('setup'); show('app');
+  $('userEmail').textContent = user.email;
+  loadBiens(); loadLocataires();
+}
+
+/* ---------- Navigation onglets ---------- */
+document.querySelectorAll('.tab[data-view]').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    const v = t.dataset.view;
+    $('view-biens').classList.toggle('hidden', v !== 'biens');
+    $('view-locataires').classList.toggle('hidden', v !== 'locataires');
+  };
+});
+
+/* ---------- BIENS ---------- */
+async function loadBiens(){
+  $('biensList').innerHTML = '<div class="loading">Chargement…</div>';
+  const { data, error } = await sb.from('properties').select('*').order('created_at', { ascending:false });
+  if (error) { $('biensList').innerHTML = `<div class="empty">Erreur : ${error.message}</div>`; return; }
+  if (!data.length) { $('biensList').innerHTML = '<div class="empty"><div class="big">🏢</div>Aucun bien pour le moment.<br>Clique sur « Ajouter un bien ».</div>'; return; }
+  $('biensList').innerHTML = '<div class="grid">' + data.map(p => {
+    const st = STATUS[p.status] || STATUS.vacant;
+    return `<div class="pcard">
+      <button class="del" data-delbien="${p.id}">🗑️</button>
+      <div class="top"><div class="tic">${TYPE_ICON[p.type]||'🏢'}</div>
+        <div><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type)}</div></div></div>
+      <span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>
+      <div class="foot"><div class="price">${fmt(p.rent_amount)} <small>FCFA/mois</small></div>
+        <div class="pc">${p.rooms?p.rooms+' p.':''}${p.surface?' · '+p.surface+' m²':''}</div></div>
+    </div>`;
+  }).join('') + '</div>';
+  document.querySelectorAll('[data-delbien]').forEach(b => b.onclick = () => delBien(b.dataset.delbien));
+}
+$('addBienBtn').onclick = () => show('bienModal');
+$('saveBien').onclick = async () => {
+  const name = $('b_name').value.trim();
+  if (!name) { toast('Le nom est requis'); return; }
+  $('saveBien').disabled = true;
+  const { error } = await sb.from('properties').insert({
+    name, type: $('b_type').value, city: $('b_city').value.trim(),
+    rent_amount: parseInt($('b_rent').value)||0, status: $('b_status').value,
+    rooms: parseInt($('b_rooms').value)||null, surface: parseFloat($('b_surface').value)||null
+  });
+  $('saveBien').disabled = false;
+  if (error) { toast('Erreur : '+error.message); return; }
+  ['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');
+  hide('bienModal'); toast('Bien ajouté ✓'); loadBiens();
+};
+async function delBien(id){
+  if (!confirm('Supprimer ce bien ?')) return;
+  const { error } = await sb.from('properties').delete().eq('id', id);
+  if (error) { toast('Erreur : '+error.message); return; }
+  toast('Bien supprimé'); loadBiens();
+}
+
+/* ---------- LOCATAIRES ---------- */
+async function loadLocataires(){
+  $('locList').innerHTML = '<div class="loading">Chargement…</div>';
+  const { data, error } = await sb.from('tenants').select('*').order('created_at', { ascending:false });
+  if (error) { $('locList').innerHTML = `<div class="empty">Erreur : ${error.message}</div>`; return; }
+  if (!data.length) { $('locList').innerHTML = '<div class="empty"><div class="big">👥</div>Aucun locataire pour le moment.</div>'; return; }
+  $('locList').innerHTML = '<div class="tcard">' + data.map(t => {
+    const initials = (t.full_name||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+    return `<div class="trow"><div class="av">${initials}</div>
+      <div><div class="nm">${esc(t.full_name)}</div>
+      <div class="meta">${esc(t.phone||'—')}${t.email?' · '+esc(t.email):''}${t.cni?' · CNI '+esc(t.cni):''}</div></div>
+      <button class="del" data-delloc="${t.id}">🗑️</button></div>`;
+  }).join('') + '</div>';
+  document.querySelectorAll('[data-delloc]').forEach(b => b.onclick = () => delLoc(b.dataset.delloc));
+}
+$('addLocBtn').onclick = () => show('locModal');
+$('saveLoc').onclick = async () => {
+  const full_name = $('l_name').value.trim();
+  if (!full_name) { toast('Le nom est requis'); return; }
+  $('saveLoc').disabled = true;
+  const { error } = await sb.from('tenants').insert({
+    full_name, phone: $('l_phone').value.trim(), cni: $('l_cni').value.trim(), email: $('l_email').value.trim()
+  });
+  $('saveLoc').disabled = false;
+  if (error) { toast('Erreur : '+error.message); return; }
+  ['l_name','l_phone','l_cni','l_email'].forEach(i=>$(i).value='');
+  hide('locModal'); toast('Locataire ajouté ✓'); loadLocataires();
+};
+async function delLoc(id){
+  if (!confirm('Supprimer ce locataire ?')) return;
+  const { error } = await sb.from('tenants').delete().eq('id', id);
+  if (error) { toast('Erreur : '+error.message); return; }
+  toast('Locataire supprimé'); loadLocataires();
+}
+
+/* ---------- utils ---------- */
+function esc(s){ return String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => { hide('bienModal'); hide('locModal'); });
+document.querySelectorAll('.ov').forEach(o => o.onclick = (e) => { if (e.target === o) o.classList.add('hidden'); });
+
+init();
+</script>
+</body>
+</html>
