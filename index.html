@@ -236,6 +236,10 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
 <div id="app" class="hidden">
   <div class="topbar">
     <span class="mk">🏠</span><div class="name">ImmoGestion<span>Cameroun</span></div>
+    <div class="searchbox" style="flex:1;max-width:420px;position:relative">
+      <input id="globalSearch" placeholder="🔍 Rechercher un bien, locataire, contrat…" autocomplete="off" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13px;background:var(--gray-50)">
+      <div id="searchResults" class="hidden" style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-lg);max-height:62vh;overflow:auto;z-index:30"></div>
+    </div>
     <div class="right"><span class="email" id="userEmail"></span><button class="btn gh" id="logoutBtn" style="padding:9px 14px;font-size:12.5px">Déconnexion</button></div>
   </div>
   <div class="tabs">
@@ -392,6 +396,32 @@ const prop=(id)=>state.properties.find(x=>x.id===id),ten=(id)=>state.tenants.fin
 const initials=(n)=>(n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
 
 document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));});
+
+/* ===== RECHERCHE GLOBALE ===== */
+function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));}
+function goSearch(type,id){$('searchResults').classList.add('hidden');$('globalSearch').value='';if(type==='bien')navTab('biens');else if(type==='loc')navTab('loc');else if(type==='contrat')navTab('contrats');else if(type==='pay')navTab('pay');else if(type==='sin'){navTab('sin');openSin(id);}}
+function renderGlobalSearch(raw){const box=$('searchResults');const q=String(raw||'').trim().toLowerCase();if(q.length<2){box.classList.add('hidden');box.innerHTML='';return;}
+  const has=(...vals)=>vals.some(v=>v&&String(v).toLowerCase().includes(q));
+  const biens=state.properties.filter(p=>has(p.name,p.city,p.type)).slice(0,6);
+  const locs=state.tenants.filter(t=>has(t.full_name,t.phone,t.email,t.cni)).slice(0,6);
+  const contrats=state.contracts.filter(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return has(pr&&pr.name,t&&t.full_name);}).slice(0,6);
+  const pays=state.payments.filter(p=>{const pr=prop(p.property_id),t=ten(p.tenant_id);return has(p.period,p.type,pr&&pr.name,t&&t.full_name);}).slice(0,6);
+  const sins=state.incidents.filter(i=>{const pr=prop(i.property_id);return has(i.title,i.type,pr&&pr.name);}).slice(0,6);
+  const item=(icon,title,meta,type,id)=>`<div class="row" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line-soft)" onclick="goSearch('${type}','${id}')"><div class="av" style="width:32px;height:32px;background:var(--gray-100)">${icon}</div><div><div class="nm">${esc(title)}</div><div class="meta">${esc(meta)}</div></div></div>`;
+  const group=(label,arr)=>arr.length?`<div style="padding:8px 12px 4px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)">${label}</div>`+arr.join(''):'';
+  let html='';
+  html+=group('Biens',biens.map(p=>item(TYPE_ICON[p.type]||'🏢',p.name,(p.city||'')+' · '+fmt(p.rent_amount)+' FCFA','bien',p.id)));
+  html+=group('Locataires',locs.map(t=>item('👤',t.full_name,t.phone||t.email||'','loc',t.id)));
+  html+=group('Contrats',contrats.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return item('📄',pr?pr.name:'—',(t?t.full_name:'—')+(c.end_date?' · fin '+c.end_date:''),'contrat',c.id);}));
+  html+=group('Paiements',pays.map(p=>{const pr=prop(p.property_id),t=ten(p.tenant_id);return item('💳',(t?t.full_name:'—')+' · '+fmt(p.amount)+' FCFA',(pr?pr.name:'')+' · '+(p.period||p.type),'pay',p.id);}));
+  html+=group('Sinistres',sins.map(i=>{const pr=prop(i.property_id);return item((SKIND[i.type]||SKIND.autre)[0],i.title,pr?pr.name:'—','sin',i.id);}));
+  box.innerHTML=html||('<div style="padding:16px;text-align:center;color:var(--faint);font-size:13px">Aucun résultat pour « '+esc(q)+' »</div>');
+  box.classList.remove('hidden');
+}
+$('globalSearch').oninput=(e)=>renderGlobalSearch(e.target.value);
+$('globalSearch').onfocus=(e)=>{if(e.target.value.trim().length>=2)renderGlobalSearch(e.target.value);};
+$('globalSearch').onblur=()=>setTimeout(()=>$('searchResults').classList.add('hidden'),200);
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape')$('searchResults').classList.add('hidden');});
 
 /* ===== DASHBOARD with charts + insights ===== */
 function monthKey(d){const dt=new Date(d);return isNaN(dt)?null:dt.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});}
