@@ -7,9 +7,9 @@
 <title>ImmoGestion Cameroun</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- jsPDF est charge a la demande (au 1er telechargement de PDF) pour accelerer le demarrage -->
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -19,6 +19,8 @@
   --gray-900:#111827;--gray-800:#1f2937;--gray-700:#374151;--gray-600:#4b5563;--gray-500:#6b7280;--gray-400:#9ca3af;--gray-300:#d1d5db;--gray-200:#e5e7eb;--gray-100:#f3f4f6;--gray-50:#f9fafb;
   --ink:#111827;--muted:#6b7280;--faint:#9ca3af;--paper:#ffffff;--surface:#ffffff;
   --line:#e5e7eb;--line-soft:#f3f4f6;--red:#ef4444;--red-bg:#fee2e2;--blue:#2563eb;--blue-bg:#dbeafe;--amber:#f59e0b;--amber-bg:#fef3c7;
+  /* alias de compatibilite (anciennes couleurs encore utilisees dans le JS) */
+  --green-50:#dcfce7;--green-700:#10b981;--green-800:#15803d;--gold-600:#d97706;
   --sh-xs:0 1px 2px 0 rgba(0,0,0,.05);
   --sh-sm:0 1px 3px 0 rgba(0,0,0,.1),0 1px 2px 0 rgba(0,0,0,.06);
   --sh-md:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);
@@ -211,6 +213,14 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
 </script>
 <!-- ╚════════════════════════════════════════════╝ -->
 
+<div id="splash" style="position:fixed;inset:0;display:grid;place-items:center;background:#f9fafb;z-index:100">
+  <div style="text-align:center">
+    <div style="width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,#2563eb,#0f172a);display:grid;place-items:center;color:#fff;font-size:27px;margin:0 auto 14px;box-shadow:0 10px 15px -3px rgba(0,0,0,.1)">🏠</div>
+    <div style="font-weight:700;color:#0f172a;font-size:16px">ImmoGestion</div>
+    <div style="color:#6b7280;font-size:13px;margin-top:6px">Chargement…</div>
+  </div>
+</div>
+
 <div id="setup" class="hidden"><h2 class="dsp">⚙️ Presque prêt !</h2><p>Colle tes 2 clés Supabase tout en haut du fichier (comme aux étapes précédentes), puis recharge.</p></div>
 
 <div id="auth" class="hidden"><div class="authcard">
@@ -341,9 +351,10 @@ const state={user:null,properties:[],tenants:[],contracts:[],payments:[],inciden
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
 function init(){
-  if(SUPABASE_URL.includes('VOTRE-PROJET')||SUPABASE_ANON_KEY.includes('VOTRE-CLE')){show('setup');return;}
+  if(!window.supabase){hide('splash');show('auth');setAuthMsg('Connexion lente au demarrage. Recharge la page si rien ne s\'affiche.','err');return;}
+  if(SUPABASE_URL.includes('VOTRE-PROJET')||SUPABASE_ANON_KEY.includes('VOTRE-CLE')){hide('splash');show('setup');return;}
   sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-  sb.auth.getSession().then(({data})=>{ if(data.session)openApp(data.session.user); else show('auth'); });
+  sb.auth.getSession().then(({data})=>{ hide('splash'); if(data.session)openApp(data.session.user); else show('auth'); });
   sb.auth.onAuthStateChange((_e,s)=>{ if(s)openApp(s.user); });
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
@@ -359,7 +370,7 @@ $('authBtn').onclick=async()=>{const email=$('email').value.trim(),password=$('p
 function trad(m){if(/Invalid login/i.test(m))return'Email ou mot de passe incorrect.';if(/already/i.test(m))return'Cet email a déjà un compte.';if(/6 char/i.test(m))return'Mot de passe : 6 caractères minimum.';return m;}
 $('logoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload();};
 
-async function openApp(u){state.user=u;hide('auth');hide('setup');
+async function openApp(u){state.user=u;hide('splash');hide('auth');hide('setup');
   // Détection du rôle : si l'email connecté correspond à une fiche locataire -> espace locataire
   let myT=null; try{const{data}=await sb.from('tenants').select('*');if(data)myT=data.find(x=>x.email&&x.email.toLowerCase()===(u.email||'').toLowerCase())||null;}catch(e){}
   myTenant=myT; role=myTenant?'tenant':'owner';
@@ -426,7 +437,7 @@ function renderDash(){
   if(chRev)chRev.destroy(); if(chOcc)chOcc.destroy();
   const ctxR=$('cRev'); if(ctxR){const g=ctxR.getContext('2d').createLinearGradient(0,0,0,240);g.addColorStop(0,'rgba(37,99,235,.85)');g.addColorStop(1,'rgba(37,99,235,.15)');
     chRev=new Chart(ctxR,{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:g,borderRadius:8,maxBarThickness:42,borderColor:'rgba(37,99,235,.2)',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:12,titleFont:{size:13,weight:'bold'},bodyFont:{size:12},cornerRadius:8,displayColors:false,callbacks:{label:(c)=>fmt(c.parsed.y)+' FCFA'}}},scales:{y:{ticks:{callback:(v)=>v>=1000?(v/1000)+'k':v,color:'#9ca3af',font:{size:10,weight:'600'}},grid:{color:'#e5e7eb',drawBorder:false}},x:{ticks:{color:'#9ca3af',font:{size:11,weight:'600'}},grid:{display:false}}}}});}
-  const ctxO=$('cOcc'); if(ctxO){chOcc=new Chart(ctxO,{type:'doughnut',data:{labels:['Occupé','Vacant','Maintenance'],datasets:[{data:[occ,vac,maint],backgroundColor:['#10b981','#f59e0b','#2563eb'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11,weight:'600'},color:'#6b7280',padding:14}}},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:10,titleFont:{size:12,weight:'bold'},bodyFont:{size:11},cornerRadius:8,displayColors:false}}}});}
+  const ctxO=$('cOcc'); if(ctxO){chOcc=new Chart(ctxO,{type:'doughnut',data:{labels:['Occupé','Vacant','Maintenance'],datasets:[{data:[occ,vac,maint],backgroundColor:['#10b981','#f59e0b','#2563eb'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11,weight:'600'},color:'#6b7280',padding:14}},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:10,titleFont:{size:12,weight:'bold'},bodyFont:{size:11},cornerRadius:8,displayColors:false}}}});}
 }
 
 /* ===== BIENS ===== */
@@ -609,15 +620,23 @@ function openTenantSinModal(){
 /* ===== suppression générique ===== */
 async function delRow(table,id,label){if(!confirm('Supprimer ?'))return;const {error}=await sb.from(table).delete().eq('id',id);if(error){toast(error.message);return;}toast(label+' supprimé');await loadAll();}
 
+/* ===== Chargement a la demande de jsPDF (accelere le demarrage) ===== */
+let _jspdf=null;
+function ensureJsPDF(){
+  if(window.jspdf)return Promise.resolve(true);
+  if(!_jspdf){toast('Préparation du PDF…');_jspdf=new Promise((resolve)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=()=>resolve(true);s.onerror=()=>resolve(false);document.head.appendChild(s);});}
+  return _jspdf;
+}
+
 /* ===== PDF ===== */
 const bailleurLabel=()=>role==='owner'?((state.user&&state.user.email)||''):'Votre bailleur';
 function pdfHeader(doc){doc.setFillColor(10,74,46);doc.rect(0,0,210,26,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('ImmoGestion Cameroun',14,16);doc.setTextColor(20,36,32);doc.setFont('helvetica','normal');}
-function pdfRecu(id){const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);const titre=p.type==='loyer'?'QUITTANCE DE LOYER':'REÇU DE PAIEMENT';doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text(titre,14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+(p.paid_at||new Date().toISOString().slice(0,10)),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',bailleurLabel());line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant paye :',14,y);doc.setTextColor(14,107,64);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Recu genere par ImmoGestion. Signature du bailleur :',14,y);doc.line(150,y,196,y);doc.save(titre.toLowerCase().replace(/ /g,'_')+'.pdf');}
-function pdfContrat(id){const c=state.contracts.find(x=>x.id===id);const pr=prop(c.property_id),t=ten(c.tenant_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text('CONTRAT DE BAIL',14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');let y=56;const para=(txt)=>{const ls=doc.splitTextToSize(txt,182);doc.text(ls,14,y);y+=ls.length*6+3;};para('Entre les soussignes :');para('LE BAILLEUR : '+bailleurLabel());para('LE LOCATAIRE : '+(t?t.full_name:'—')+(t&&t.cni?' (CNI '+t.cni+')':'')+(t&&t.phone?', tel. '+t.phone:''));y+=2;doc.setFont('helvetica','bold');doc.text('Il a ete convenu ce qui suit :',14,y);y+=9;doc.setFont('helvetica','normal');para('Article 1 - Objet : Location du bien : '+(pr?pr.name:'—')+(pr&&pr.city?', situe a '+pr.city:'')+'.');para('Article 2 - Duree : du '+(c.start_date||'____')+' au '+(c.end_date||'____')+'.');para('Article 3 - Loyer : '+fmt(c.rent_amount)+' FCFA par mois, payable d\'avance.');para('Article 4 - Caution : '+fmt(c.deposit_amount)+' FCFA versee a la signature.');para('Article 5 - Le locataire entretient le bien et paie aux echeances convenues.');y+=8;doc.text('Fait le '+new Date().toISOString().slice(0,10),14,y);y+=18;doc.text('Le Bailleur',24,y);doc.text('Le Locataire',140,y);doc.line(14,y+16,70,y+16);doc.line(130,y+16,186,y+16);doc.save('contrat_bail.pdf');}
+async function pdfRecu(id){if(!await ensureJsPDF()){toast('PDF indisponible (connexion ?)');return;}const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);const titre=p.type==='loyer'?'QUITTANCE DE LOYER':'REÇU DE PAIEMENT';doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text(titre,14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+(p.paid_at||new Date().toISOString().slice(0,10)),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',bailleurLabel());line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant paye :',14,y);doc.setTextColor(14,107,64);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Recu genere par ImmoGestion. Signature du bailleur :',14,y);doc.line(150,y,196,y);doc.save(titre.toLowerCase().replace(/ /g,'_')+'.pdf');}
+async function pdfContrat(id){if(!await ensureJsPDF()){toast('PDF indisponible (connexion ?)');return;}const c=state.contracts.find(x=>x.id===id);const pr=prop(c.property_id),t=ten(c.tenant_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text('CONTRAT DE BAIL',14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');let y=56;const para=(txt)=>{const ls=doc.splitTextToSize(txt,182);doc.text(ls,14,y);y+=ls.length*6+3;};para('Entre les soussignes :');para('LE BAILLEUR : '+bailleurLabel());para('LE LOCATAIRE : '+(t?t.full_name:'—')+(t&&t.cni?' (CNI '+t.cni+')':'')+(t&&t.phone?', tel. '+t.phone:''));y+=2;doc.setFont('helvetica','bold');doc.text('Il a ete convenu ce qui suit :',14,y);y+=9;doc.setFont('helvetica','normal');para('Article 1 - Objet : Location du bien : '+(pr?pr.name:'—')+(pr&&pr.city?', situe a '+pr.city:'')+'.');para('Article 2 - Duree : du '+(c.start_date||'____')+' au '+(c.end_date||'____')+'.');para('Article 3 - Loyer : '+fmt(c.rent_amount)+' FCFA par mois, payable d\'avance.');para('Article 4 - Caution : '+fmt(c.deposit_amount)+' FCFA versee a la signature.');para('Article 5 - Le locataire entretient le bien et paie aux echeances convenues.');y+=8;doc.text('Fait le '+new Date().toISOString().slice(0,10),14,y);y+=18;doc.text('Le Bailleur',24,y);doc.text('Le Locataire',140,y);doc.line(14,y+16,70,y+16);doc.line(130,y+16,186,y+16);doc.save('contrat_bail.pdf');}
 
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.querySelectorAll('.ov').forEach(o=>o.classList.add('hidden')));
 document.querySelectorAll('.ov').forEach(o=>o.onclick=(e)=>{if(e.target===o)o.classList.add('hidden');});
-init();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 </script>
 </body>
 </html>
