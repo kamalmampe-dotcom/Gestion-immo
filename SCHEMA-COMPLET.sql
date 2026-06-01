@@ -11,12 +11,8 @@
 -- ---------- 0) Extension pour gen_random_uuid() ----------
 create extension if not exists pgcrypto;
 
--- ---------- 1) Fonction super-admin ----------
--- security definer => contourne la RLS pour éviter toute récursion.
-create or replace function is_super() returns boolean
-  language sql security definer stable as $$
-  select exists (select 1 from public.profiles where id = auth.uid() and role = 'super');
-$$;
+-- (La fonction is_super() est créée plus bas, APRÈS la table profiles
+--  qu'elle utilise, sinon PostgreSQL refuse : "profiles does not exist".)
 
 -- ===================================================================
 -- 2) TABLES (création si absentes)
@@ -148,6 +144,15 @@ alter table payments   add column if not exists cancelled          boolean defau
 alter table payments   add column if not exists cancel_reason      text;
 alter table incidents  add column if not exists comments           jsonb   default '[]'::jsonb;
 alter table profiles   add column if not exists role               text    default 'owner';
+
+-- ===================================================================
+-- 3bis) Fonction super-admin (créée APRÈS la table profiles)
+--       security definer => contourne la RLS pour éviter toute récursion.
+-- ===================================================================
+create or replace function is_super() returns boolean
+  language sql security definer stable as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'super');
+$$;
 
 -- ===================================================================
 -- 4) RLS : activer + politiques (bailleur = ses lignes ; super = tout)
