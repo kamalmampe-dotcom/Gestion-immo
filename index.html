@@ -265,6 +265,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
     <button class="tab" data-view="contrats">📄 Contrats</button>
     <button class="tab" data-view="pay">💳 Paiements</button>
     <button class="tab" data-view="sin">🛠️ Sinistres</button>
+    <button class="tab" data-view="docs">📁 Documents</button>
     <button class="tab" data-view="journal">📋 Journal</button>
   </div>
   <div class="wrap" id="view-dash"></div>
@@ -273,6 +274,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
   <div class="wrap hidden" id="view-contrats"><div class="sectit"><h2 class="dsp">Contrats de bail</h2><button class="btn pri" id="addContratBtn">+ Générer un contrat</button></div><div id="contratsList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-pay"><div class="sectit"><h2 class="dsp">Paiements</h2><button class="btn pri" id="addPayBtn">+ Enregistrer un paiement</button></div><div id="payList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-sin"><div class="sectit"><h2 class="dsp">Sinistres & maintenance</h2><button class="btn pri" id="addSinBtn">+ Déclarer un sinistre</button></div><div id="sinFilters" style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap"></div><div id="sinList"><div class="loading">Chargement…</div></div></div>
+  <div class="wrap hidden" id="view-docs"><div class="sectit"><h2 class="dsp">Documents</h2></div><input id="docSearch" class="inp" placeholder="🔍 Filtrer les documents…" oninput="renderDocs()" style="max-width:420px"><div id="docsList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-journal"><div class="sectit"><h2 class="dsp">Journal d'activité</h2></div><div id="journalList"><div class="loading">Chargement…</div></div></div>
 </div>
 
@@ -491,10 +493,10 @@ async function loadAll(){
 const prop=(id)=>state.properties.find(x=>x.id===id),ten=(id)=>state.tenants.find(x=>x.id===id),contr=(id)=>state.contracts.find(x=>x.id===id);
 const initials=(n)=>(n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
 
-document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin','journal'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));if(t.dataset.view==='journal')renderJournal();});
+document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin','docs','journal'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));if(t.dataset.view==='journal')renderJournal();if(t.dataset.view==='docs')renderDocs();});
 
 /* ===== RECHERCHE GLOBALE ===== */
-function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin','journal'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));if(v==='journal')renderJournal();}
+function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin','docs','journal'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));if(v==='journal')renderJournal();if(v==='docs')renderDocs();}
 function goSearch(type,id){$('searchResults').classList.add('hidden');$('globalSearch').value='';if(type==='bien')navTab('biens');else if(type==='loc')navTab('loc');else if(type==='contrat')navTab('contrats');else if(type==='pay')navTab('pay');else if(type==='sin'){navTab('sin');openSin(id);}}
 function renderGlobalSearch(raw){const box=$('searchResults');const q=String(raw||'').trim().toLowerCase();if(q.length<2){box.classList.add('hidden');box.innerHTML='';return;}
   const has=(...vals)=>vals.some(v=>v&&String(v).toLowerCase().includes(q));
@@ -566,6 +568,8 @@ function renderDash(){
   const topBien=topId?prop(topId):null;
   const sinOuverts=state.incidents.filter(i=>i.status!=='cloture').length;
   const echeRetard=state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+contractSchedule(c).lateTot,0);
+  const yearNow=new Date().getFullYear();
+  const revAnnee=paidAll.filter(p=>{const d=new Date(p.paid_at||p.created_at);return !isNaN(d)&&d.getFullYear()===yearNow;}).reduce((s,p)=>s+(p.amount||0),0);
   const series={}; const now=new Date();
   for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);series[d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'})]=0;}
   paidAll.forEach(p=>{const k=monthKey(p.paid_at||p.created_at);if(k&&k in series)series[k]+=p.amount;});
@@ -596,6 +600,7 @@ function renderDash(){
     ${(expSoon.length||expired.length)?`<div class="card" style="border-left:4px solid var(--amber);margin-bottom:16px"><div class="bd"><div style="font-weight:700;margin-bottom:6px">⏰ Contrats à surveiller</div>${expired.map(c=>{const pr=prop(c.property_id),tt=ten(c.tenant_id);return `<div class="row"><div class="av" style="background:var(--red-bg);color:var(--red)">⚠️</div><div><div class="nm">${esc(pr?pr.name:'—')} · ${esc(tt?tt.full_name:'—')}</div><div class="meta">Expiré le ${c.end_date}</div></div><span class="b red" style="margin-left:auto"><span class="d"></span>Expiré</span></div>`;}).join('')}${expSoon.map(c=>{const pr=prop(c.property_id),tt=ten(c.tenant_id),days=Math.ceil((new Date(c.end_date)-now)/86400000);return `<div class="row"><div class="av" style="background:var(--amber-bg);color:var(--amber)">⏰</div><div><div class="nm">${esc(pr?pr.name:'—')} · ${esc(tt?tt.full_name:'—')}</div><div class="meta">Expire le ${c.end_date} (dans ${days} j)</div></div>${tt&&tt.phone?`<button class="ibtn" style="margin-left:auto;color:#25D366" onclick="relanceExpiration('${c.id}')">💬</button>`:`<span class="b amber" style="margin-left:auto"><span class="d"></span>Bientôt</span>`}</div>`;}).join('')}</div></div>`:''}
     <div class="kpis stagger">
       <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">💰</div><div class="lbl">Revenus encaissés</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">📈 ${paid.length} paiement(s)</div></div>
+      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📅</div><div class="lbl">Revenus annuels ${yearNow}</div><div class="val dsp">${fmt(revAnnee)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">cumul de l'année</div></div>
       <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${fmt(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${impayes.length} en attente</div></div>
       <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🔧</div><div class="lbl">Dépenses maintenance</div><div class="val dsp">${fmt(maintCost)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">réparations</div></div>
       <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📈</div><div class="lbl">Bénéfice net</div><div class="val dsp" style="color:${benefice>=0?'#10b981':'#ef4444'}">${fmt(benefice)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">encaissé − maintenance</div></div>
@@ -721,6 +726,27 @@ function renderJournal(){
   const l=state.audit||[];
   if(!l.length){$('journalList').innerHTML='<div class="empty"><div class="big">📋</div>Aucune activité enregistrée pour le moment.<div style="font-size:13px;margin-top:6px">Applique la Phase 2 du fichier SQL-A-COLLER.sql pour activer le journal.</div></div>';return;}
   $('journalList').innerHTML='<div class="tcard">'+l.map(a=>{const d=new Date(a.created_at);const when=isNaN(d)?'':d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});return `<div class="trow"><div class="av" style="background:var(--gray-100)">${AUDIT_ICON[a.action]||'•'}</div><div><div class="nm">${esc(a.label||a.action)}</div><div class="meta">${esc(a.entity||'')}${a.actor_email?' · '+esc(a.actor_email):''} · ${when}</div></div></div>`;}).join('')+'</div>';
+}
+
+/* ===== DOCUMENTS (vue centralisée) ===== */
+async function openDocPath(p){const u=await signedDoc(p);if(u)window.open(u,'_blank');else toast('Document indisponible');}
+function docRow(icon,title,meta,actionHtml){return `<div class="trow"><div class="av" style="background:var(--gray-100)">${icon}</div><div><div class="nm">${esc(title)}</div><div class="meta">${esc(meta)}</div></div><div class="acts">${actionHtml}</div></div>`;}
+function renderDocs(){
+  const q=(($('docSearch')||{}).value||'').trim().toLowerCase();
+  const m=(...v)=>!q||v.some(x=>x&&String(x).toLowerCase().includes(q));
+  const sec=[];
+  const cts=state.contracts.filter(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return m(pr&&pr.name,t&&t.full_name,'bail','contrat');});
+  if(cts.length)sec.push(['📄 Baux ('+cts.length+')',cts.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return docRow('📄','Bail · '+(pr?pr.name:'—'),(t?t.full_name:'—')+' · '+(c.start_date||'?'),`<button class="ibtn green" title="Télécharger le bail" onclick="pdfContrat('${c.id}')">📥</button>`);}).join('')]);
+  const qs=state.payments.filter(p=>p.status==='paye'&&!p.cancelled).filter(p=>{const pr=prop(p.property_id),t=ten(p.tenant_id);return m(pr&&pr.name,t&&t.full_name,p.period,'quittance');});
+  if(qs.length)sec.push(['🧾 Quittances ('+qs.length+')',qs.map(p=>{const pr=prop(p.property_id),t=ten(p.tenant_id);return docRow('🧾','Quittance · '+(t?t.full_name:'—'),(pr?pr.name:'')+' · '+(p.period||p.type)+' · '+fmt(p.amount)+' FCFA',`<button class="ibtn green" title="Télécharger la quittance" onclick="pdfRecu('${p.id}')">📥</button>`);}).join('')]);
+  const docsLoc=[];
+  state.tenants.forEach(t=>{if(!m(t.full_name,'cni','piece','justificatif'))return;if(t.cni_doc_url)docsLoc.push(docRow('🪪','CNI · '+t.full_name,t.cni||'Pièce d\'identité',`<button class="ibtn" title="Ouvrir" onclick="openDocPath('${esc(t.cni_doc_url)}')">👁️</button>`));if(t.profession_doc_url)docsLoc.push(docRow('📑','Justificatif · '+t.full_name,t.profession||'Profession',`<button class="ibtn" title="Ouvrir" onclick="openDocPath('${esc(t.profession_doc_url)}')">👁️</button>`));});
+  if(docsLoc.length)sec.push(['🪪 Pièces des locataires ('+docsLoc.length+')',docsLoc.join('')]);
+  const sph=[];
+  state.incidents.forEach(i=>{const pr=prop(i.property_id);if(!m(i.title,pr&&pr.name,'sinistre','photo'))return;if(i.photo_before)sph.push(docRow('📷','Photo avant · '+(i.title||'Sinistre'),pr?pr.name:'—',`<button class="ibtn" title="Ouvrir" onclick="window.open('${esc(i.photo_before)}','_blank')">👁️</button>`));if(i.photo_after)sph.push(docRow('📸','Photo après · '+(i.title||'Sinistre'),pr?pr.name:'—',`<button class="ibtn" title="Ouvrir" onclick="window.open('${esc(i.photo_after)}','_blank')">👁️</button>`));});
+  if(sph.length)sec.push(['📷 Photos de sinistres ('+sph.length+')',sph.join('')]);
+  if(!sec.length){$('docsList').innerHTML='<div class="empty"><div class="big">📁</div>Aucun document'+(q?' pour « '+esc(q)+' »':'.')+'</div>';return;}
+  $('docsList').innerHTML=sec.map(([title,html])=>`<div style="margin-bottom:18px"><div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:4px 0 8px">${title}</div><div class="tcard">${html}</div></div>`).join('');
 }
 $('addPayBtn').onclick=()=>{if(!state.contracts.length){toast('Crée d\'abord un contrat.');return;}$('p_contract').innerHTML=state.contracts.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<option value="${c.id}">${esc(t?t.full_name:'?')} — ${esc(pr?pr.name:'?')}</option>`;}).join('');const c0=contr($('p_contract').value)||state.contracts[0];$('p_amount').value=c0?c0.rent_amount:'';show('payModal');};
 $('p_contract').onchange=()=>{const c=contr($('p_contract').value);if(c)$('p_amount').value=c.rent_amount;};
