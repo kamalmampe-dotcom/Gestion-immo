@@ -41,4 +41,17 @@ create policy "audit owner all" on audit_logs for all
 -- Un appartement peut être rattaché à un immeuble (un bien de type 'Immeuble').
 alter table properties add column if not exists parent_id uuid;
 
+-- ---------- PHASE 4 : Profil bailleur enrichi + avenants + super-admin ----------
+alter table profiles  add column if not exists city               text;
+alter table profiles  add column if not exists cni                text;
+alter table profiles  add column if not exists address            text;
+alter table profiles  add column if not exists active             boolean default true;
+alter table contracts add column if not exists parent_contract_id uuid;  -- avenant
+
+-- Permettre au super-admin de gérer les autres comptes (sinon il ne peut éditer que le sien)
+drop policy if exists "profiles self" on profiles;
+create policy "profiles self" on profiles for all
+  using (id = auth.uid() or is_super())
+  with check (id = auth.uid() or is_super());
+
 -- Recharge l'application après avoir cliqué "Run".
