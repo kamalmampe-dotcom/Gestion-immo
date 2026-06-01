@@ -524,20 +524,22 @@ const frMonth=(d)=>cap(d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'
 function penaltyFor(c,remaining){if(!c)return 0;const v=Number(c.penalty_value)||0;if(!v)return 0;return c.penalty_mode==='pourcentage'?Math.round((Number(c.rent_amount)||remaining||0)*v/100):v;}
 /* Échéancier calculé d'un contrat : on génère les périodes échues puis on répartit les paiements en cascade */
 function contractSchedule(c){
-  if(!c||!c.start_date||c.status==='brouillon'||c.status==='attente')return {rows:[],credit:0,dueTot:0,paidTot:0,remTot:0,lateTot:0};
+  if(!c||!c.start_date||c.status==='brouillon'||c.status==='attente'||c.status==='resilie')return {rows:[],credit:0,dueTot:0,paidTot:0,remTot:0,lateTot:0};
   const step=(FREQ[c.frequency]||FREQ.mensuel)[1];
+  const payday=Math.min(28,Math.max(1,Number(c.payment_day)||5));
   const start=new Date(c.start_date), now=new Date(), end=c.end_date?new Date(c.end_date):null;
   const rows=[]; let d=new Date(start), guard=0;
   while(guard++<800){
     if(end&&d>end)break;
     if(d>now)break; /* on ne génère que les périodes déjà commencées */
     const lbl=step===1?frMonth(d):frMonth(d)+' → '+frMonth(addMonths(d,step-1));
-    rows.push({date:new Date(d),label:lbl,due:(Number(c.rent_amount)||0)*step});
+    const dueDate=new Date(d.getFullYear(),d.getMonth(),payday); /* date limite de paiement */
+    rows.push({date:new Date(d),dueDate,label:lbl,due:(Number(c.rent_amount)||0)*step});
     d=addMonths(d,step);
   }
   let pool=state.payments.filter(p=>p.contract_id===c.id&&!p.cancelled&&p.status==='paye'&&(p.type==='loyer'||p.type==='avance')).reduce((s,p)=>s+(Number(p.amount)||0),0);
   let dueTot=0,paidTot=0,remTot=0,lateTot=0;
-  rows.forEach(e=>{const pay=Math.min(pool,e.due);e.paid=pay;pool-=pay;e.remaining=e.due-e.paid;e.late=e.remaining>0&&now>addMonths(e.date,step);if(e.late){e.days=Math.floor((now-addMonths(e.date,step))/86400000);e.penalty=penaltyFor(c,e.remaining);lateTot+=e.remaining;}dueTot+=e.due;paidTot+=e.paid;remTot+=e.remaining;});
+  rows.forEach(e=>{const pay=Math.min(pool,e.due);e.paid=pay;pool-=pay;e.remaining=e.due-e.paid;e.late=e.remaining>0&&now>e.dueDate;if(e.late){e.days=Math.floor((now-e.dueDate)/86400000);e.penalty=penaltyFor(c,e.remaining);lateTot+=e.remaining;}dueTot+=e.due;paidTot+=e.paid;remTot+=e.remaining;});
   return {rows:rows.reverse(),credit:pool,dueTot,paidTot,remTot,lateTot};
 }
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
@@ -646,7 +648,6 @@ document.addEventListener('keydown',(e)=>{if(e.key==='Escape')$('searchResults')
 function notifItems(){const out=[],now=new Date();
   state.incidents.filter(i=>i.status==='declare').forEach(i=>{const pr=prop(i.property_id);out.push({icon:'🛠️',title:'Sinistre à traiter',meta:(i.title||'')+(pr?' · '+pr.name:''),type:'sin',id:i.id});});
   state.contracts.filter(c=>c.end_date&&((new Date(c.end_date)-now)/86400000)<=30).forEach(c=>{const pr=prop(c.property_id),past=new Date(c.end_date)<now;out.push({icon:'⏰',title:past?'Contrat expiré':'Contrat expire bientôt',meta:(pr?pr.name:'')+' · '+c.end_date,type:'contrat',id:c.id});});
-  state.payments.filter(p=>p.status!=='paye'&&!p.cancelled).forEach(p=>{const t=ten(p.tenant_id);out.push({icon:'⚠️',title:'Impayé',meta:(t?t.full_name:'—')+' · '+fmt(p.amount)+' FCFA',type:'pay',id:p.id});});
   state.contracts.filter(c=>!c.archived&&c.status!=='resilie').forEach(c=>{const sc=contractSchedule(c);sc.rows.filter(e=>e.late).forEach(e=>{const pr=prop(c.property_id),t=ten(c.tenant_id);out.push({icon:'📆',title:'Échéance en retard',meta:(t?t.full_name:'—')+' · '+(pr?pr.name:'')+' · '+e.label+' · '+fmt(e.remaining)+' FCFA',type:'contrat',id:c.id});});});
   return out;}
 function renderNotifs(){const items=notifItems(),n=items.length,badge=$('bellBadge');if(!badge)return;if(n){badge.textContent=n>99?'99+':n;badge.classList.remove('hidden');}else badge.classList.add('hidden');
@@ -665,11 +666,12 @@ function setDashYear(v){dashYear=v;renderDash();}
 function setDashMonth(v){dashMonth=v;renderDash();}
 function exportExcel(){const rows=[];const csvCell=(v)=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};const push=(...c)=>rows.push(c.map(csvCell).join(';'));
   const paidAll=state.payments.filter(p=>p.status==='paye'&&!p.cancelled),encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
-  const dueAll=state.payments.filter(p=>p.status!=='paye'&&!p.cancelled).reduce((s,p)=>s+(p.amount||0),0);
+  const dueAll=state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+contractSchedule(c).remTot,0);
   const maintAll=state.incidents.reduce((s,i)=>s+(i.cost||0),0);
-  const occ=state.properties.filter(p=>p.status==='occupe').length,tot=state.properties.length||1;
+  const rentableX=state.properties.filter(p=>!p.archived&&p.type!=='Immeuble');
+  const occ=rentableX.filter(p=>p.status==='occupe').length,tot=rentableX.length||1;
   push('ImmoGestion - Export du '+new Date().toLocaleDateString('fr-FR'));push('');
-  push('INDICATEURS');push('Revenus encaisses (FCFA)',encAll);push('Impayes (FCFA)',dueAll);push('Depenses maintenance (FCFA)',maintAll);push('Benefice net (FCFA)',encAll-maintAll);push('Taux occupation (%)',Math.round(occ/tot*100));push('Sinistres ouverts',state.incidents.filter(i=>i.status!=='cloture').length);push('Nombre de biens',state.properties.length);push('Loyers attendus / mois (FCFA)',state.contracts.reduce((s,c)=>s+(c.rent_amount||0),0));push('');
+  push('INDICATEURS');push('Revenus encaisses (FCFA)',encAll);push('Impayes (FCFA)',dueAll);push('Depenses maintenance (FCFA)',maintAll);push('Benefice net (FCFA)',encAll-maintAll);push('Taux occupation (%)',Math.round(occ/tot*100));push('Sinistres ouverts',state.incidents.filter(i=>i.status!=='cloture').length);push('Nombre de logements',rentableX.length);push('Loyers attendus / mois (FCFA)',state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+(c.rent_amount||0),0));push('');
   push('BIENS');push('Nom','Type','Ville','Loyer (FCFA)','Statut','Pieces','Surface (m2)');state.properties.forEach(p=>push(p.name,p.type,p.city,p.rent_amount,p.status,p.rooms,p.surface));push('');
   push('LOCATAIRES');push('Nom','Telephone','Email','CNI');state.tenants.forEach(t=>push(t.full_name,t.phone,t.email,t.cni));push('');
   push('PAIEMENTS');push('Locataire','Bien','Type','Montant (FCFA)','Statut','Periode','Paye le');state.payments.forEach(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id);push(t?t.full_name:'',pr?pr.name:'',p.type,p.amount,(PAY[p.status]||['','?'])[1],p.period,p.paid_at);});push('');
@@ -677,19 +679,23 @@ function exportExcel(){const rows=[];const csvCell=(v)=>{v=String(v??'');return 
   const csv='﻿'+rows.join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='immogestion_export_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('Export Excel telecharge ✓');}
 function renderDash(){
   const actifs=state.properties.filter(p=>!p.archived);
-  const occ=actifs.filter(p=>p.status==='occupe').length, vac=actifs.filter(p=>p.status==='vacant').length, res=actifs.filter(p=>p.status==='reserve').length, prev=actifs.filter(p=>p.status==='preavis').length, maint=actifs.filter(p=>p.status==='maintenance').length, tot=actifs.length||1;
+  const rentable=actifs.filter(p=>p.type!=='Immeuble'); /* l'immeuble-conteneur n'est pas un logement louable */
+  const occ=rentable.filter(p=>p.status==='occupe').length, vac=rentable.filter(p=>p.status==='vacant').length, res=rentable.filter(p=>p.status==='reserve').length, prev=rentable.filter(p=>p.status==='preavis').length, maint=rentable.filter(p=>p.status==='maintenance').length, tot=rentable.length||1;
   const paidAll=state.payments.filter(p=>p.status==='paye'&&!p.cancelled);
   const paid=paidAll.filter(p=>dashInPeriod(p.paid_at||p.created_at)), encaisse=paid.reduce((s,p)=>s+(p.amount||0),0);
   const encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
-  const impayes=state.payments.filter(p=>p.status!=='paye'&&!p.cancelled), dueImp=impayes.reduce((s,p)=>s+(p.amount||0),0);
+  /* Impayés = source UNIQUE : l'échéancier (loyers échus et non réglés) */
+  const activeContracts=state.contracts.filter(c=>!c.archived&&c.status!=='resilie');
+  const dueList=[]; activeContracts.forEach(c=>{contractSchedule(c).rows.forEach(e=>{if(e.remaining>0)dueList.push({contract_id:c.id,tenant_id:c.tenant_id,property_id:c.property_id,amount:e.remaining,period:e.label,dueDate:e.dueDate,late:e.late});});});
+  const impayes=dueList, dueImp=dueList.reduce((s,x)=>s+x.amount,0);
   const recouvr=encAll+dueImp>0?Math.round(encAll/(encAll+dueImp)*100):100;
-  const loyersAttendus=state.contracts.reduce((s,c)=>s+(c.rent_amount||0),0);
+  const loyersAttendus=activeContracts.reduce((s,c)=>s+(c.rent_amount||0),0);
   const maintCost=state.incidents.filter(i=>dashInPeriod(i.created_at)).reduce((s,i)=>s+(i.cost||0),0), benefice=encaisse-maintCost;
   const revByProp={}; paidAll.forEach(p=>{revByProp[p.property_id]=(revByProp[p.property_id]||0)+p.amount;});
   let topId=null,topV=0; Object.entries(revByProp).forEach(([k,v])=>{if(v>topV){topV=v;topId=k;}});
   const topBien=topId?prop(topId):null;
   const sinOuverts=state.incidents.filter(i=>i.status!=='cloture').length;
-  const echeRetard=state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+contractSchedule(c).lateTot,0);
+  const echeRetard=dueList.filter(x=>x.late).reduce((s,x)=>s+x.amount,0);
   const yearNow=new Date().getFullYear();
   const revAnnee=paidAll.filter(p=>{const d=new Date(p.paid_at||p.created_at);return !isNaN(d)&&d.getFullYear()===yearNow;}).reduce((s,p)=>s+(p.amount||0),0);
   const series={}; const now=new Date();
@@ -698,12 +704,12 @@ function renderDash(){
 
   const expSoon=state.contracts.filter(c=>{if(!c.end_date)return false;const days=(new Date(c.end_date)-now)/86400000;return days>=0&&days<=30;});
   const expired=state.contracts.filter(c=>c.end_date&&new Date(c.end_date)<now);
-  const unpaidAge=impayes.filter(p=>p.created_at).map(p=>(now-new Date(p.created_at))/86400000);
+  const unpaidAge=dueList.filter(x=>x.late&&x.dueDate).map(x=>(now-new Date(x.dueDate))/86400000);
   const ancMoy=unpaidAge.length?Math.round(unpaidAge.reduce((a,b)=>a+b,0)/unpaidAge.length):0;
   const revBien={}; paidAll.forEach(p=>{const pr=prop(p.property_id),nm=pr?pr.name:'—';revBien[nm]=(revBien[nm]||0)+p.amount;});
   const revBienSorted=Object.entries(revBien).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const impSeries={}; for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);impSeries[d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'})]=0;}
-  impayes.forEach(p=>{const k=monthKey(p.created_at);if(k&&k in impSeries)impSeries[k]+=p.amount;});
+  dueList.forEach(x=>{const k=monthKey(x.dueDate);if(k&&k in impSeries)impSeries[k]+=x.amount;});
   const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const years=[...new Set(state.payments.map(p=>{const d=new Date(p.paid_at||p.created_at);return isNaN(d)?null:d.getFullYear();}).filter(Boolean))].sort((a,b)=>b-a);
   const yearOpts=`<option value="all"${dashYear==='all'?' selected':''}>Toutes les années</option>`+years.map(y=>`<option value="${y}"${dashYear===String(y)?' selected':''}>${y}</option>`).join('');
@@ -723,13 +729,13 @@ function renderDash(){
     <div class="kpis stagger">
       <div class="kpi" data-wm="💰"><div class="ic" style="background:#dcfce7;color:#10b981">💰</div><div class="lbl">Revenus encaissés</div><div class="val dsp">${cup(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">📈 ${paid.length} paiement(s)</div></div>
       <div class="kpi" data-wm="📅"><div class="ic" style="background:#dbeafe;color:#2563eb">📅</div><div class="lbl">Revenus annuels ${yearNow}</div><div class="val dsp">${cup(revAnnee)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">cumul de l'année</div></div>
-      <div class="kpi" data-wm="⚠️"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${cup(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${impayes.length} en attente</div></div>
+      <div class="kpi" data-wm="⚠️"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${cup(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${dueList.length} échéance(s) due(s)</div></div>
       <div class="kpi" data-wm="🔧"><div class="ic" style="background:#fef3c7;color:#f59e0b">🔧</div><div class="lbl">Dépenses maintenance</div><div class="val dsp">${cup(maintCost)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">réparations</div></div>
       <div class="kpi" data-wm="📈"><div class="ic" style="background:#dbeafe;color:#2563eb">📈</div><div class="lbl">Bénéfice net</div><div class="val dsp" style="color:${benefice>=0?'#10b981':'#ef4444'}">${cup(benefice)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">encaissé − maintenance</div></div>
-      <div class="kpi" data-wm="📊"><div class="ic" style="background:#dbeafe;color:#2563eb">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${cup(Math.round(occ/tot*100))}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${state.properties.length} biens</div></div>
+      <div class="kpi" data-wm="📊"><div class="ic" style="background:#dbeafe;color:#2563eb">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${cup(Math.round(occ/tot*100))}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${rentable.length} logements</div></div>
       <div class="kpi" data-wm="📅"><div class="ic" style="background:#dcfce7;color:#10b981">📅</div><div class="lbl">Loyers attendus / mois</div><div class="val dsp">${cup(loyersAttendus)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">${state.contracts.length} contrat(s)</div></div>
       <div class="kpi" data-wm="🛠️"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${cup(sinOuverts)}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
-      <div class="kpi" data-wm="🏢"><div class="ic" style="background:#dbeafe;color:#2563eb">🏢</div><div class="lbl">Biens</div><div class="val dsp">${cup(state.properties.length)}</div><div class="tr" style="color:var(--muted)">${occ} occ · ${vac} vac</div></div>
+      <div class="kpi" data-wm="🏢"><div class="ic" style="background:#dbeafe;color:#2563eb">🏢</div><div class="lbl">Logements</div><div class="val dsp">${cup(rentable.length)}</div><div class="tr" style="color:var(--muted)">${occ} occ · ${vac} dispo</div></div>
       <div class="kpi" data-wm="⏰"><div class="ic" style="background:#fef3c7;color:#f59e0b">⏰</div><div class="lbl">Contrats expirants</div><div class="val dsp">${cup(expSoon.length)}</div><div class="tr" style="color:${expired.length?'#ef4444':'var(--muted)'}">${expired.length} expiré(s)</div></div>
     </div>
     <div class="charts">
@@ -749,7 +755,7 @@ function renderDash(){
     </div>
     <div class="charts">
       <div class="card"><div class="hd">Derniers paiements</div><div class="bd">${state.payments.length?state.payments.slice(0,5).map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;return `<div class="row"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||p.type)}</div></div><div style="margin-left:auto;text-align:right"><div class="dsp" style="font-weight:700;font-size:13px">${fmt(p.amount)}</div><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span></div></div>`;}).join(''):'<div class="empty" style="padding:22px">Aucun paiement.</div>'}</div></div>
-      <div class="card"><div class="hd">À relancer 🔔</div><div class="bd">${impayes.length?impayes.slice(0,5).map(p=>{const t=ten(p.tenant_id);return `<div class="row"><div class="av" style="background:var(--red-bg);color:var(--red)">⚠️</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${fmt(p.amount)} FCFA · ${esc(p.period||'')}</div></div>${t&&t.phone?`<button class="ibtn" style="margin-left:auto;color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}</div>`;}).join(''):'<div class="empty" style="padding:22px">🎉 Aucun impayé. Tout est à jour !</div>'}</div></div>
+      <div class="card"><div class="hd">À relancer 🔔</div><div class="bd">${dueList.length?dueList.slice().sort((a,b)=>(b.late-a.late)).slice(0,6).map(x=>{const t=ten(x.tenant_id);return `<div class="row"><div class="av" style="background:var(--red-bg);color:var(--red)">${x.late?'⏰':'⚠️'}</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${fmt(x.amount)} FCFA · ${esc(x.period||'')}${x.late?' · en retard':''}</div></div>${t&&t.phone?`<button class="ibtn" style="margin-left:auto;color:#25D366" onclick="relanceEcheance('${x.contract_id}',${JSON.stringify(x.period).replace(/"/g,'&quot;')},${x.amount})">💬</button>`:''}</div>`;}).join(''):'<div class="empty" style="padding:22px">🎉 Aucun impayé. Tout est à jour !</div>'}</div></div>
     </div>`;
   animateCups($('view-dash'));
   const labels=Object.keys(series), vals=Object.values(series);
