@@ -320,6 +320,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
       <button class="tab" data-view="sin"><span class="ti">🛠️</span><span class="tl">Sinistres</span></button>
       <button class="tab" data-view="docs"><span class="ti">📁</span><span class="tl">Documents</span></button>
       <button class="tab" data-view="journal"><span class="ti">📋</span><span class="tl">Journal</span></button>
+      <button class="tab hidden" id="usersTab" data-view="users"><span class="ti">👑</span><span class="tl">Utilisateurs</span></button>
     </nav>
     <div class="sb-foot">
       <div class="sb-user" onclick="openProfile()" title="Mon profil"><span class="sb-av" id="sbAvatar">👤</span><div class="sb-uinfo"><b id="userEmail"></b><span>Voir mon profil</span></div></div>
@@ -345,6 +346,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
   <div class="wrap hidden" id="view-sin"><div class="sectit"><h2 class="dsp">Sinistres & maintenance</h2><button class="btn pri" id="addSinBtn">+ Déclarer un sinistre</button></div><div id="sinFilters" style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap"></div><div id="sinList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-docs"><div class="sectit"><h2 class="dsp">Documents</h2></div><input id="docSearch" class="inp" placeholder="🔍 Filtrer les documents…" oninput="renderDocs()" style="max-width:420px"><div id="docsList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-journal"><div class="sectit"><h2 class="dsp">Journal d'activité</h2></div><div id="journalList"><div class="loading">Chargement…</div></div></div>
+  <div class="wrap hidden" id="view-users"><div class="sectit"><h2 class="dsp">👑 Gestion des utilisateurs</h2></div><div id="usersList"><div class="loading">Chargement…</div></div></div>
   </div>
 </div>
 
@@ -507,7 +509,7 @@ const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
 let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list',showArchived=false,myProfile=null,isSuper=false;
-const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[],audit:[]};
+const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[],audit:[],profiles:[]};
 /* Journal d'audit : trace toutes les actions importantes (defensif si la table n'existe pas encore) */
 async function logAudit(action,entity,entityId,label){try{const r=await sb.from('audit_logs').insert({action,entity,entity_id:entityId||null,label:label||null,actor_email:state.user?state.user.email:null});return r;}catch(e){}}
 const AUDIT_ICON={creation:'➕',modification:'✏️',annulation:'🚫',resiliation:'⛔',paiement:'💳',connexion:'🔑',sinistre:'🛠️',validation:'✅'};
@@ -554,18 +556,20 @@ async function openApp(u){state.user=u;hide('splash');hide('auth');hide('setup')
   $('userEmail').textContent=(myProfile&&myProfile.full_name)?myProfile.full_name:u.email;
   {const sba=$('sbAvatar');if(sba)sba.innerHTML=(myProfile&&myProfile.photo_url)?`<img src="${esc(myProfile.photo_url)}">`:'👤';}
   const banner=$('superBanner');if(banner)banner.classList.toggle('hidden',!isSuper);
+  {const ut=$('usersTab');if(ut)ut.classList.toggle('hidden',!isSuper);}
   if(!state._loggedConn){state._loggedConn=true;logAudit('connexion','session',null,'Connexion de '+(u.email||''));}
   await loadAll();}
 async function loadAll(){
-  const [p,t,c,pay,inc,aud]=await Promise.all([
+  const [p,t,c,pay,inc,aud,prof]=await Promise.all([
     sb.from('properties').select('*').order('created_at',{ascending:false}),
     sb.from('tenants').select('*').order('created_at',{ascending:false}),
     sb.from('contracts').select('*').order('created_at',{ascending:false}),
     sb.from('payments').select('*').order('created_at',{ascending:false}),
     sb.from('incidents').select('*').order('created_at',{ascending:false}),
     sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(200),
+    sb.from('profiles').select('*'),
   ]);
-  state.properties=p.data||[];state.tenants=t.data||[];state.contracts=c.data||[];state.payments=pay.data||[];state.incidents=inc.data||[];state.audit=aud.data||[];
+  state.properties=p.data||[];state.tenants=t.data||[];state.contracts=c.data||[];state.payments=pay.data||[];state.incidents=inc.data||[];state.audit=aud.data||[];state.profiles=prof.data||[];
   if(inc.error){toast('⚠️ Table Sinistres manquante — fais la Phase Supabase du guide v3.');}
   renderDash();renderBiens();renderLoc();renderContrats();renderPay();renderSin();renderNotifs();checkNewIncidents();
 }
@@ -575,10 +579,10 @@ const initials=(n)=>(n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpper
 function openSidebar(){const s=$('sidebar');if(s)s.classList.add('open');const b=$('sbBackdrop');if(b)b.classList.add('show');}
 function closeSidebar(){const s=$('sidebar');if(s)s.classList.remove('open');const b=$('sbBackdrop');if(b)b.classList.remove('show');}
 $('sbToggle')&&($('sbToggle').onclick=openSidebar);
-document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin','docs','journal'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));if(t.dataset.view==='journal')renderJournal();if(t.dataset.view==='docs')renderDocs();closeSidebar();});
+document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin','docs','journal','users'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));if(t.dataset.view==='journal')renderJournal();if(t.dataset.view==='docs')renderDocs();if(t.dataset.view==='users')renderUsers();closeSidebar();});
 
 /* ===== RECHERCHE GLOBALE ===== */
-function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin','docs','journal'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));if(v==='journal')renderJournal();if(v==='docs')renderDocs();}
+function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin','docs','journal','users'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));if(v==='journal')renderJournal();if(v==='docs')renderDocs();if(v==='users')renderUsers();}
 function goSearch(type,id){$('searchResults').classList.add('hidden');$('globalSearch').value='';if(type==='bien')navTab('biens');else if(type==='loc')navTab('loc');else if(type==='contrat')navTab('contrats');else if(type==='pay')navTab('pay');else if(type==='sin'){navTab('sin');openSin(id);}}
 function renderGlobalSearch(raw){const box=$('searchResults');const q=String(raw||'').trim().toLowerCase();if(q.length<2){box.classList.add('hidden');box.innerHTML='';return;}
   const has=(...vals)=>vals.some(v=>v&&String(v).toLowerCase().includes(q));
@@ -848,6 +852,16 @@ function renderDocs(){
   if(!sec.length){$('docsList').innerHTML='<div class="empty"><div class="big">📁</div>Aucun document'+(q?' pour « '+esc(q)+' »':'.')+'</div>';return;}
   $('docsList').innerHTML=sec.map(([title,html])=>`<div style="margin-bottom:18px"><div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:4px 0 8px">${title}</div><div class="tcard">${html}</div></div>`).join('');
 }
+
+/* ===== SUPER-ADMIN : gestion des utilisateurs ===== */
+function renderUsers(){
+  if(!isSuper){$('usersList').innerHTML='<div class="empty">Accès réservé au super-admin.</div>';return;}
+  const l=state.profiles||[];
+  if(!l.length){$('usersList').innerHTML='<div class="empty"><div class="big">👑</div>Aucun utilisateur.<div style="font-size:13px;margin-top:6px">Vérifie que le SQL super-admin est appliqué.</div></div>';return;}
+  $('usersList').innerHTML='<div class="tcard">'+l.map(u=>{const me=u.id===state.user.id;const active=u.active!==false;return `<div class="trow"${active?'':' style="opacity:.55"'}><div class="av">${u.photo_url?`<img src="${esc(u.photo_url)}">`:'👤'}</div><div><div class="nm">${esc(u.full_name||'(sans nom)')}${me?' <span class="b blue">moi</span>':(u.role==='super'?' <span class="b gold">super</span>':'')}</div><div class="meta">${esc(u.company||'')}${u.phone?' · '+esc(u.phone):''}${u.city?' · '+esc(u.city):''}</div></div><div class="acts"><select class="inp" style="width:auto;margin:0;padding:7px 10px" onchange="changeUserRole('${u.id}',this.value)"${me?' disabled':''}><option value="owner"${u.role!=='super'?' selected':''}>Bailleur</option><option value="super"${u.role==='super'?' selected':''}>Super-admin</option></select>${me?'':`<button class="ibtn ${active?'red':'green'}" title="${active?'Désactiver':'Réactiver'}" onclick="toggleUserActive('${u.id}',${active})">${active?'🚫':'✅'}</button>`}</div></div>`;}).join('')+'</div><div class="smeta" style="color:var(--muted);margin-top:12px">Note : la création de comptes se fait via l\'inscription. Ici tu gères les rôles et l\'activation.</div>';
+}
+async function changeUserRole(id,role){if(id===state.user.id){toast('Vous ne pouvez pas changer votre propre rôle.');return;}const {error}=await sb.from('profiles').update({role}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Rôle mis à jour ✓');await logAudit('modification','utilisateur',id,'Rôle → '+role);await loadAll();renderUsers();}
+async function toggleUserActive(id,cur){const {error}=await sb.from('profiles').update({active:!cur}).eq('id',id);if(error&&/column|schema|active/i.test(error.message)){toast('Action impossible : applique le SQL super-admin (colonne active).');return;}if(error){toast('Erreur : '+error.message);return;}toast(cur?'Compte désactivé':'Compte réactivé');await logAudit('modification','utilisateur',id,cur?'Désactivé':'Réactivé');await loadAll();renderUsers();}
 $('addPayBtn').onclick=()=>{if(!state.contracts.length){toast('Crée d\'abord un contrat.');return;}$('p_contract').innerHTML=state.contracts.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<option value="${c.id}">${esc(t?t.full_name:'?')} — ${esc(pr?pr.name:'?')}</option>`;}).join('');const c0=contr($('p_contract').value)||state.contracts[0];$('p_amount').value=c0?c0.rent_amount:'';show('payModal');};
 $('p_contract').onchange=()=>{const c=contr($('p_contract').value);if(c)$('p_amount').value=c.rent_amount;};
 $('savePay').onclick=async()=>{const c=contr($('p_contract').value);if(!c){toast('Choisis un contrat');return;}$('savePay').disabled=true;const status=$('p_status').value;const payload={contract_id:c.id,tenant_id:c.tenant_id,property_id:c.property_id,type:$('p_type').value,amount:parseInt($('p_amount').value)||0,status,period:$('p_period').value.trim()||null,paid_at:status==='paye'?new Date().toISOString().slice(0,10):null,mode:$('p_mode').value};
