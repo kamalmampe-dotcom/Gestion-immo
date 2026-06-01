@@ -358,7 +358,7 @@ const PAY={paye:['green','Payé'],en_attente:['amber','En attente'],retard:['red
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
-let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list';
+let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list',showArchived=false;
 const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[]};
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
@@ -543,11 +543,13 @@ function renderDash(){
 }
 
 /* ===== BIENS ===== */
-function renderBiens(){const l=state.properties;
-  if(!l.length){$('biensList').innerHTML='<div class="empty"><div class="big">🏢</div>Aucun bien. Clique « Ajouter un bien ».</div>';return;}
-  $('biensList').innerHTML='<div class="grid">'+l.map(p=>{const st=STATUS[p.status]||STATUS.vacant;return `<div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b ${st[0]} st"><span class="d"></span>${st[1]}</span><button class="del" data-editbien="${p.id}" title="Modifier" style="right:48px">✏️</button><button class="del" data-delbien="${p.id}">🗑️</button></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type)}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`;}).join('')+'</div>';
+function renderBiens(){const l=state.properties.filter(p=>!!p.archived===showArchived);
+  if(!l.length){$('biensList').innerHTML=archBar()+'<div class="empty"><div class="big">🏢</div>'+(showArchived?'Aucun bien archivé.':'Aucun bien. Clique « Ajouter un bien ».')+'</div>';return;}
+  $('biensList').innerHTML=archBar()+'<div class="grid">'+l.map(p=>{const st=STATUS[p.status]||STATUS.vacant;return `<div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b ${st[0]} st"><span class="d"></span>${st[1]}</span>${p.archived?`<button class="del" data-restbien="${p.id}" title="Restaurer" style="right:86px">↩️</button>`:`<button class="del" data-archbien="${p.id}" title="Archiver" style="right:86px">📦</button>`}<button class="del" data-editbien="${p.id}" title="Modifier" style="right:48px">✏️</button><button class="del" data-delbien="${p.id}">🗑️</button></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type)}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-delbien]').forEach(b=>b.onclick=()=>delRow('properties',b.dataset.delbien,'Bien'));
   document.querySelectorAll('[data-editbien]').forEach(b=>b.onclick=()=>openEditBien(b.dataset.editbien));
+  document.querySelectorAll('[data-archbien]').forEach(b=>b.onclick=()=>archiveRow('properties',b.dataset.archbien));
+  document.querySelectorAll('[data-restbien]').forEach(b=>b.onclick=()=>restoreRow('properties',b.dataset.restbien));
 }
 $('addBienBtn').onclick=()=>{editBienId=null;photoFile=null;$('photoPreview').innerHTML='';['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_status').value='vacant';$('bienModalTitle').textContent='Ajouter un bien';show('bienModal');};
 $('photobox').onclick=()=>$('b_photo').click();
@@ -562,9 +564,9 @@ $('saveBien').onclick=async()=>{const name=$('b_name').value.trim();if(!name){to
 function openEditBien(id){const p=prop(id);if(!p)return;editBienId=id;photoFile=null;$('b_name').value=p.name||'';$('b_type').value=p.type||'Appartement';$('b_city').value=p.city||'';$('b_rent').value=p.rent_amount||'';$('b_status').value=p.status||'vacant';$('b_rooms').value=p.rooms||'';$('b_surface').value=p.surface||'';$('photoPreview').innerHTML=p.photo_url?`<img src="${esc(p.photo_url)}">`:'';$('bienModalTitle').textContent='Modifier le bien';show('bienModal');}
 
 /* ===== LOCATAIRES ===== */
-function renderLoc(){const l=state.tenants;
-  if(!l.length){$('locList').innerHTML='<div class="empty"><div class="big">👥</div>Aucun locataire.</div>';return;}
-  $('locList').innerHTML='<div class="tcard">'+l.map(t=>`<div class="trow"><div class="av">${t.photo_url?`<img src="${esc(t.photo_url)}">`:initials(t.full_name)}</div><div><div class="nm">${esc(t.full_name)}</div><div class="meta">${esc(t.phone||'—')}${t.email?' · '+esc(t.email):''}${t.cni?' · CNI '+esc(t.cni):''}</div></div><div class="acts">${t.phone?`<button class="ibtn" style="color:#25D366" title="WhatsApp" onclick="waTenant('${t.id}')">💬</button>`:''}<button class="ibtn" data-editloc="${t.id}" title="Modifier">✏️</button><button class="ibtn red" data-delloc="${t.id}">🗑️</button></div></div>`).join('')+'</div>';
+function renderLoc(){const l=state.tenants.filter(t=>!!t.archived===showArchived);
+  if(!l.length){$('locList').innerHTML=archBar()+'<div class="empty"><div class="big">👥</div>'+(showArchived?'Aucun locataire archivé.':'Aucun locataire.')+'</div>';return;}
+  $('locList').innerHTML=archBar()+'<div class="tcard">'+l.map(t=>`<div class="trow"><div class="av">${t.photo_url?`<img src="${esc(t.photo_url)}">`:initials(t.full_name)}</div><div><div class="nm">${esc(t.full_name)}</div><div class="meta">${esc(t.phone||'—')}${t.email?' · '+esc(t.email):''}${t.cni?' · CNI '+esc(t.cni):''}</div></div><div class="acts">${t.phone?`<button class="ibtn" style="color:#25D366" title="WhatsApp" onclick="waTenant('${t.id}')">💬</button>`:''}${t.archived?`<button class="ibtn" title="Restaurer" onclick="restoreRow('tenants','${t.id}')">↩️</button>`:`<button class="ibtn" title="Archiver" onclick="archiveRow('tenants','${t.id}')">📦</button>`}<button class="ibtn" data-editloc="${t.id}" title="Modifier">✏️</button><button class="ibtn red" data-delloc="${t.id}">🗑️</button></div></div>`).join('')+'</div>';
   document.querySelectorAll('[data-delloc]').forEach(b=>b.onclick=()=>delRow('tenants',b.dataset.delloc,'Locataire'));
   document.querySelectorAll('[data-editloc]').forEach(b=>b.onclick=()=>openEditLoc(b.dataset.editloc));
 }
@@ -580,9 +582,9 @@ $('saveLoc').onclick=async()=>{const full_name=$('l_name').value.trim();if(!full
 function openEditLoc(id){const t=ten(id);if(!t)return;editLocId=id;locPhotoFile=null;$('l_name').value=t.full_name||'';$('l_phone').value=t.phone||'';$('l_cni').value=t.cni||'';$('l_email').value=t.email||'';$('locPhotoPreview').innerHTML=t.photo_url?`<img src="${esc(t.photo_url)}">`:'';$('locModalTitle').textContent='Modifier le locataire';show('locModal');}
 
 /* ===== CONTRATS ===== */
-function renderContrats(){const l=state.contracts;
-  if(!l.length){$('contratsList').innerHTML='<div class="empty"><div class="big">📄</div>Aucun contrat.</div>';return;}
-  $('contratsList').innerHTML='<div class="tcard">'+l.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">📄</div><div><div class="nm">${esc(pr?pr.name:'Bien supprimé')}</div><div class="meta">${esc(t?t.full_name:'—')} · ${c.start_date||'?'} → ${c.end_date||'?'} · ${fmt(c.rent_amount)} FCFA</div></div>${contractStatusBadge(c)}<div class="acts"><button class="ibtn green" data-pdfc="${c.id}" title="Bail PDF">📥</button><button class="ibtn red" data-delc="${c.id}">🗑️</button></div></div>`;}).join('')+'</div>';
+function renderContrats(){const l=state.contracts.filter(c=>!!c.archived===showArchived);
+  if(!l.length){$('contratsList').innerHTML=archBar()+'<div class="empty"><div class="big">📄</div>'+(showArchived?'Aucun contrat archivé.':'Aucun contrat.')+'</div>';return;}
+  $('contratsList').innerHTML=archBar()+'<div class="tcard">'+l.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">📄</div><div><div class="nm">${esc(pr?pr.name:'Bien supprimé')}</div><div class="meta">${esc(t?t.full_name:'—')} · ${c.start_date||'?'} → ${c.end_date||'?'} · ${fmt(c.rent_amount)} FCFA</div></div>${contractStatusBadge(c)}<div class="acts"><button class="ibtn green" data-pdfc="${c.id}" title="Bail PDF">📥</button>${c.archived?`<button class="ibtn" title="Restaurer" onclick="restoreRow('contracts','${c.id}')">↩️</button>`:`<button class="ibtn" title="Archiver" onclick="archiveRow('contracts','${c.id}')">📦</button>`}<button class="ibtn red" data-delc="${c.id}">🗑️</button></div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-pdfc]').forEach(b=>b.onclick=()=>pdfContrat(b.dataset.pdfc));
   document.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>delRow('contracts',b.dataset.delc,'Contrat'));
 }
@@ -748,6 +750,10 @@ function openTenantSinModal(){
 
 /* ===== suppression générique ===== */
 async function delRow(table,id,label){if(!confirm('Supprimer ?'))return;const {error}=await sb.from(table).delete().eq('id',id);if(error){toast(error.message);return;}toast(label+' supprimé');await loadAll();}
+function archBar(){return `<div style="margin-bottom:14px;display:flex;gap:6px"><button class="tab ${!showArchived?'on':''}" onclick="setArchived(false)">Actifs</button><button class="tab ${showArchived?'on':''}" onclick="setArchived(true)">📦 Archivés</button></div>`;}
+function setArchived(v){showArchived=v;renderBiens();renderLoc();renderContrats();}
+async function archiveRow(table,id){const {error}=await sb.from(table).update({archived:true}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Archivé ✓');await loadAll();}
+async function restoreRow(table,id){const {error}=await sb.from(table).update({archived:false}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Restauré ✓');await loadAll();}
 
 /* ===== Chargement a la demande de jsPDF (accelere le demarrage) ===== */
 let _jspdf=null;
