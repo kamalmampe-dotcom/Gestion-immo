@@ -27,15 +27,18 @@ Application web de **gestion locative pour bailleurs au Cameroun**, que je veux 
 
 ## Base de données Supabase (tables existantes)
 Toutes ont une colonne `owner_id uuid default auth.uid()` et une règle RLS `owner_id = auth.uid()` :
-- `properties` (biens) : type, name, city, rent_amount, status, rooms, surface, photo_url
-- `tenants` (locataires) : full_name, phone, email, cni, photo_url
-- `contracts` : property_id, tenant_id, start_date, end_date, rent_amount, deposit_amount, status
+- `properties` (biens) : type, name, city, rent_amount, status, rooms, surface, photo_url, **archived**
+- `tenants` (locataires) : full_name, phone, email, cni, photo_url, **profession, cni_doc_url, profession_doc_url, archived**
+- `contracts` : property_id, tenant_id, start_date, end_date, rent_amount, deposit_amount, status, **validated, archived**
 - `payments` : contract_id, tenant_id, property_id, type, amount, status, period, paid_at
 - `incidents` (sinistres) : property_id, tenant_id, title, description, type, priority, status, cost, contractor, photo_before, photo_after, **comments (jsonb)**, resolved_at
-- Bucket de stockage **`photos`** (public) pour les images.
+- Bucket de stockage **`photos`** (public) pour les images et les documents (CNI, justificatifs).
+- **`profiles`** (1 par utilisateur connecté = bailleur/super-admin) : id (=auth.uid), full_name, phone, company, photo_url, **role** ('owner' | 'super'). Le super-admin (role='super', via la fonction `is_super()`) voit et gère TOUTES les données par RLS.
 
 ## Ce qui marche déjà (v3)
 Connexion email/mot de passe · tableau de bord avec graphiques (revenus 6 mois, occupation) et cartes d'analyse (taux de recouvrement, loyers attendus, bien le plus rentable) · biens avec photo · locataires avec photo · contrats + bail PDF · paiements manuels + quittance PDF + relance WhatsApp · sinistres (photo avant/après, timeline d'évolution, commentaires, coût/réparateur).
+
+**Ajouté depuis (juin 2026) :** portail locataire complet · édition de toutes les fiches · factures PDF · export Excel (CSV) · filtres mois/année + KPI avancés (bénéfice net, dépenses maintenance, contrats expirants, ancienneté des impayés) · graphiques revenus-par-bien et évolution-des-impayés · recherche globale · alertes contrats expirants · vue Kanban des sinistres · WhatsApp contextuel · centre de notifications (cloche) · archivage (biens/locataires/contrats) · profil bailleur + super-admin · profil locataire avec upload CNI/justificatif + validation de contrat. La PWA charge en « cache d'abord » (sw.js v2) et jsPDF est chargé à la demande.
 
 ## Prochaine étape à développer : le PORTAIL LOCATAIRE
 Objectif : un locataire se connecte avec **email + mot de passe** et voit **uniquement ses données**.
