@@ -1,12 +1,24 @@
 {
-  "env": [
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "POSTGRES_URL",
-    "POSTGRES_URL_NON_POOLING",
-    "SUPABASE_JWT_SECRET"
-  ],
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "description": "Supabase project URL"
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "description": "Supabase anonymous key"
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "description": "Supabase service role key"
+    },
+    "POSTGRES_URL": {
+      "description": "PostgreSQL connection URL"
+    },
+    "POSTGRES_URL_NON_POOLING": {
+      "description": "PostgreSQL non-pooling connection URL"
+    },
+    "SUPABASE_JWT_SECRET": {
+      "description": "Supabase JWT secret"
+    }
+  },
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
