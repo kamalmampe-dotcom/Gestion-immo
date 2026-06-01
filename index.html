@@ -971,18 +971,25 @@ async function loadTenant(){
 }
 
 function renderTenantHome(){
-  const c=state.contracts[0],p=c?prop(c.property_id):null;
-  const paid=state.payments.filter(x=>x.status==='paye'),encaisse=paid.reduce((s,x)=>s+(x.amount||0),0);
-  const due=state.payments.filter(x=>x.status!=='paye'),dueAmt=due.reduce((s,x)=>s+(x.amount||0),0);
+  const c=state.contracts.find(x=>x.status!=='resilie')||state.contracts[0],p=c?prop(c.property_id):null;
+  const paid=state.payments.filter(x=>x.status==='paye'&&!x.cancelled),encaisse=paid.reduce((s,x)=>s+(x.amount||0),0);
+  const sc=c?contractSchedule(c):{remTot:0,lateTot:0,rows:[]};
+  const chrono=[...(sc.rows||[])].reverse();const nextDue=chrono.find(e=>e.remaining>0);
   const sinOuverts=state.incidents.filter(i=>i.status!=='cloture').length;
+  const firstName=esc((myTenant.full_name||'').split(' ')[0]||'');
   $('tview-thome').innerHTML=`
-    <div class="hero"><h2 class="dsp">Bonjour 👋</h2><p>Bienvenue dans votre espace locataire.</p></div>
-    <div style="margin-bottom:16px"><button class="btn gh" onclick="openTenantProfile()">👤 Mon profil & documents</button></div>
+    <div class="hero"><h2 class="dsp">Bonjour ${firstName} 👋</h2><p>Voici votre espace locataire, en un coup d'œil.</p></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+      <button class="btn pri" onclick="openTenantSinModal()">🛠️ Déclarer un sinistre</button>
+      ${c?`<button class="btn gh" onclick="pdfContrat('${c.id}')">📄 Mon bail (PDF)</button>`:''}
+      <button class="btn gh" onclick="openTenantProfile()">👤 Mon profil & documents</button>
+    </div>
+    ${nextDue?`<div class="card" style="border-left:4px solid ${nextDue.late?'var(--alert)':'var(--accent)'};margin-bottom:18px"><div class="bd" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div style="font-size:30px">${nextDue.late?'⏰':'📅'}</div><div><div style="font-weight:700">${nextDue.late?'Échéance en retard':'Prochaine échéance'} · ${esc(nextDue.label)}</div><div class="smeta" style="color:var(--muted)">Reste à payer : <b>${fmt(nextDue.remaining)} FCFA</b>${nextDue.late&&nextDue.penalty?` · pénalité éventuelle ${fmt(nextDue.penalty)} FCFA`:''}</div></div></div></div>`:(c?`<div class="card" style="border-left:4px solid var(--success);margin-bottom:18px"><div class="bd">✅ Vous êtes à jour de vos loyers. Merci !</div></div>`:'')}
     ${p?`<div class="grid" style="margin-bottom:16px"><div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b green st"><span class="d"></span>Mon logement</span></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type||'')}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`:'<div class="empty"><div class="big">🏠</div>Aucun logement associé pour le moment. Contactez votre bailleur.</div>'}
     <div class="kpis stagger">
       <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">🏠</div><div class="lbl">Loyer mensuel</div><div class="val dsp">${fmt(c?c.rent_amount:0)} <small>FCFA</small></div></div>
       <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">✅</div><div class="lbl">Total payé</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">${paid.length} paiement(s)</div></div>
-      <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">À régler</div><div class="val dsp">${fmt(dueAmt)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${due.length} en attente</div></div>
+      <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Reste à régler</div><div class="val dsp">${fmt(sc.remTot||0)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${sc.lateTot>0?fmt(sc.lateTot)+' en retard':'à jour'}</div></div>
       <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
     </div>`;
 }
@@ -1009,7 +1016,7 @@ function renderTenantContract(){
 function renderTenantPay(){
   const l=state.payments,h='<div class="sectit"><h2 class="dsp">Mes paiements</h2></div>';
   if(!l.length){$('tview-tpay').innerHTML=h+'<div class="empty"><div class="big">💳</div>Aucun paiement enregistré.</div>';return;}
-  $('tview-tpay').innerHTML=h+'<div class="tcard">'+l.map(p=>{const pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(p.type)} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.period||'')}</span></div><div class="meta">${esc(pr?pr.name:'')} · <b>${fmt(p.amount)} FCFA</b></div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${p.status==='paye'?`<button class="ibtn green" onclick="pdfRecu('${p.id}')" title="Quittance PDF">📥</button>`:''}</div></div>`;}).join('')+'</div>';
+  $('tview-tpay').innerHTML=h+'<div class="tcard">'+l.map(p=>{const pr=prop(p.property_id),st=p.cancelled?['red','Annulé']:(PAY[p.status]||PAY.paye);const modeLbl=p.mode?(PAYMODE[p.mode]||p.mode):'';return `<div class="trow"${p.cancelled?' style="opacity:.55"':''}><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(p.type)} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.period||'')}</span>${modeLbl?` <span class="b blue">${esc(modeLbl)}</span>`:''}</div><div class="meta">${esc(pr?pr.name:'')} · <b>${fmt(p.amount)} FCFA</b></div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${(p.status==='paye'&&!p.cancelled)?`<button class="ibtn green" onclick="pdfRecu('${p.id}')" title="Quittance PDF">📥</button>`:''}</div></div>`;}).join('')+'</div>';
 }
 
 function renderTenantSin(){
