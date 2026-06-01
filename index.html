@@ -333,7 +333,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
     <label class="lab">Photo du bien</label><div class="photobox" id="photobox">📷 Cliquez pour ajouter une photo<div id="photoPreview"></div></div><input id="b_photo" type="file" accept="image/*" class="hidden">
     <label class="lab">Nom du bien</label><input class="inp" id="b_name" placeholder="Ex : Villa Bonapriso">
     <div class="frow"><div><label class="lab">Type</label><select class="inp" id="b_type"><option>Appartement</option><option>Maison</option><option>Boutique</option><option>Bureau</option><option>Immeuble</option></select></div><div><label class="lab">Ville / quartier</label><input class="inp" id="b_city" placeholder="Douala, Bonapriso"></div></div>
-    <div class="frow"><div><label class="lab">Loyer (FCFA/mois)</label><input class="inp" id="b_rent" type="number" placeholder="450000"></div><div><label class="lab">Statut</label><select class="inp" id="b_status"><option value="vacant">Vacant</option><option value="occupe">Occupé</option><option value="maintenance">Maintenance</option></select></div></div>
+    <div class="frow"><div><label class="lab">Loyer (FCFA/mois)</label><input class="inp" id="b_rent" type="number" placeholder="450000"></div><div><label class="lab">Statut</label><select class="inp" id="b_status"><option value="vacant">Disponible</option><option value="reserve">Réservé</option><option value="occupe">Occupé</option><option value="preavis">En préavis</option><option value="maintenance">Maintenance</option></select></div></div>
     <div class="frow"><div><label class="lab">Pièces</label><input class="inp" id="b_rooms" type="number" placeholder="4"></div><div><label class="lab">Surface (m²)</label><input class="inp" id="b_surface" type="number" placeholder="120"></div></div>
   </div><div class="mf"><button class="btn pri" id="saveBien">Enregistrer</button></div>
 </div></div>
@@ -357,6 +357,9 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
     <label class="lab">Locataire</label><select class="inp" id="c_tenant"></select>
     <div class="frow"><div><label class="lab">Date de début</label><input class="inp" id="c_start" type="date"></div><div><label class="lab">Date de fin</label><input class="inp" id="c_end" type="date"></div></div>
     <div class="frow"><div><label class="lab">Loyer (FCFA)</label><input class="inp" id="c_rent" type="number"></div><div><label class="lab">Caution (FCFA)</label><input class="inp" id="c_deposit" type="number"></div></div>
+    <div class="frow"><div><label class="lab">Fréquence de paiement</label><select class="inp" id="c_freq"><option value="mensuel">Mensuel</option><option value="trimestriel">Trimestriel</option><option value="semestriel">Semestriel</option><option value="annuel">Annuel</option></select></div><div><label class="lab">Jour limite (du mois)</label><input class="inp" id="c_payday" type="number" min="1" max="31" placeholder="5"></div></div>
+    <div class="frow"><div><label class="lab">Pénalité de retard</label><select class="inp" id="c_penmode"><option value="fixe">Montant fixe (FCFA)</option><option value="pourcentage">Pourcentage du loyer (%)</option></select></div><div><label class="lab">Valeur</label><input class="inp" id="c_penval" type="number" placeholder="0"></div></div>
+    <label class="lab">Statut du contrat</label><select class="inp" id="c_status"><option value="actif">Actif</option><option value="brouillon">Brouillon</option><option value="attente">En attente de signature</option></select>
   </div><div class="mf"><button class="btn pri" id="saveContrat">Créer le contrat</button></div>
 </div></div>
 
@@ -365,8 +368,9 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
   <div class="mh"><h3 class="dsp">Enregistrer un paiement</h3><button data-close>×</button></div>
   <div class="mb">
     <label class="lab">Locataire / bien</label><select class="inp" id="p_contract"></select>
-    <div class="frow"><div><label class="lab">Type</label><select class="inp" id="p_type"><option value="loyer">Loyer</option><option value="caution">Caution</option><option value="avance">Avance</option><option value="penalite">Pénalité</option></select></div><div><label class="lab">Statut</label><select class="inp" id="p_status"><option value="paye">Payé</option><option value="en_attente">En attente</option><option value="retard">En retard</option></select></div></div>
-    <div class="frow"><div><label class="lab">Montant (FCFA)</label><input class="inp" id="p_amount" type="number"></div><div><label class="lab">Période</label><input class="inp" id="p_period" placeholder="Ex : Mai 2026"></div></div>
+    <div class="frow"><div><label class="lab">Type</label><select class="inp" id="p_type"><option value="loyer">Loyer</option><option value="caution">Caution</option><option value="avance">Avance</option><option value="penalite">Pénalité</option><option value="remboursement">Remboursement</option></select></div><div><label class="lab">Statut</label><select class="inp" id="p_status"><option value="paye">Payé</option><option value="en_attente">En attente</option><option value="retard">En retard</option></select></div></div>
+    <div class="frow"><div><label class="lab">Mode de paiement</label><select class="inp" id="p_mode"><option value="especes">Espèces</option><option value="virement">Virement</option><option value="mobile_money">Mobile Money</option><option value="cheque">Chèque</option></select></div><div><label class="lab">Montant (FCFA)</label><input class="inp" id="p_amount" type="number"></div></div>
+    <label class="lab">Période</label><input class="inp" id="p_period" placeholder="Ex : Mai 2026">
   </div><div class="mf"><button class="btn pri" id="savePay">Enregistrer</button></div>
 </div></div>
 
@@ -395,8 +399,33 @@ const $=(id)=>document.getElementById(id), show=(id)=>$(id).classList.remove('hi
 const fmt=(n)=>(Number(n)||0).toLocaleString('fr-FR');
 const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const TYPE_ICON={Appartement:'🏢',Maison:'🏡',Boutique:'🏪',Bureau:'🏬',Immeuble:'🏘️'};
-const STATUS={occupe:['green','Occupé'],vacant:['amber','Vacant'],maintenance:['blue','Maintenance']};
+const STATUS={vacant:['amber','Disponible'],reserve:['blue','Réservé'],occupe:['green','Occupé'],preavis:['gold','En préavis'],maintenance:['red','Maintenance']};
 const PAY={paye:['green','Payé'],en_attente:['amber','En attente'],retard:['red','En retard']};
+const PAYMODE={especes:'Espèces',virement:'Virement',mobile_money:'Mobile Money',cheque:'Chèque'};
+const FREQ={mensuel:['Mensuel',1],trimestriel:['Trimestriel',3],semestriel:['Semestriel',6],annuel:['Annuel',12]};
+const cap=(s)=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
+const addMonths=(d,n)=>{const x=new Date(d);x.setMonth(x.getMonth()+n);return x;};
+const frMonth=(d)=>cap(d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}));
+/* Pénalité automatique suggérée pour un retard (fixe ou % du loyer) */
+function penaltyFor(c,remaining){if(!c)return 0;const v=Number(c.penalty_value)||0;if(!v)return 0;return c.penalty_mode==='pourcentage'?Math.round((Number(c.rent_amount)||remaining||0)*v/100):v;}
+/* Échéancier calculé d'un contrat : on génère les périodes échues puis on répartit les paiements en cascade */
+function contractSchedule(c){
+  if(!c||!c.start_date||c.status==='brouillon'||c.status==='attente')return {rows:[],credit:0,dueTot:0,paidTot:0,remTot:0,lateTot:0};
+  const step=(FREQ[c.frequency]||FREQ.mensuel)[1];
+  const start=new Date(c.start_date), now=new Date(), end=c.end_date?new Date(c.end_date):null;
+  const rows=[]; let d=new Date(start), guard=0;
+  while(guard++<800){
+    if(end&&d>end)break;
+    if(d>now)break; /* on ne génère que les périodes déjà commencées */
+    const lbl=step===1?frMonth(d):frMonth(d)+' → '+frMonth(addMonths(d,step-1));
+    rows.push({date:new Date(d),label:lbl,due:(Number(c.rent_amount)||0)*step});
+    d=addMonths(d,step);
+  }
+  let pool=state.payments.filter(p=>p.contract_id===c.id&&!p.cancelled&&p.status==='paye'&&(p.type==='loyer'||p.type==='avance')).reduce((s,p)=>s+(Number(p.amount)||0),0);
+  let dueTot=0,paidTot=0,remTot=0,lateTot=0;
+  rows.forEach(e=>{const pay=Math.min(pool,e.due);e.paid=pay;pool-=pay;e.remaining=e.due-e.paid;e.late=e.remaining>0&&now>addMonths(e.date,step);if(e.late){e.days=Math.floor((now-addMonths(e.date,step))/86400000);e.penalty=penaltyFor(c,e.remaining);lateTot+=e.remaining;}dueTot+=e.due;paidTot+=e.paid;remTot+=e.remaining;});
+  return {rows:rows.reverse(),credit:pool,dueTot,paidTot,remTot,lateTot};
+}
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
@@ -487,7 +516,7 @@ document.addEventListener('keydown',(e)=>{if(e.key==='Escape')$('searchResults')
 function notifItems(){const out=[],now=new Date();
   state.incidents.filter(i=>i.status==='declare').forEach(i=>{const pr=prop(i.property_id);out.push({icon:'🛠️',title:'Sinistre à traiter',meta:(i.title||'')+(pr?' · '+pr.name:''),type:'sin',id:i.id});});
   state.contracts.filter(c=>c.end_date&&((new Date(c.end_date)-now)/86400000)<=30).forEach(c=>{const pr=prop(c.property_id),past=new Date(c.end_date)<now;out.push({icon:'⏰',title:past?'Contrat expiré':'Contrat expire bientôt',meta:(pr?pr.name:'')+' · '+c.end_date,type:'contrat',id:c.id});});
-  state.payments.filter(p=>p.status!=='paye').forEach(p=>{const t=ten(p.tenant_id);out.push({icon:'⚠️',title:'Impayé',meta:(t?t.full_name:'—')+' · '+fmt(p.amount)+' FCFA',type:'pay',id:p.id});});
+  state.payments.filter(p=>p.status!=='paye'&&!p.cancelled).forEach(p=>{const t=ten(p.tenant_id);out.push({icon:'⚠️',title:'Impayé',meta:(t?t.full_name:'—')+' · '+fmt(p.amount)+' FCFA',type:'pay',id:p.id});});
   return out;}
 function renderNotifs(){const items=notifItems(),n=items.length,badge=$('bellBadge');if(!badge)return;if(n){badge.textContent=n>99?'99+':n;badge.classList.remove('hidden');}else badge.classList.add('hidden');
   $('notifPanel').innerHTML=`<div style="padding:12px 14px;font-weight:700;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between">Notifications <span class="smeta" style="color:var(--muted)">${n}</span></div>`+(n?items.slice(0,30).map(o=>`<div class="row" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line-soft)" onclick="closeNotif();goSearch('${o.type}','${o.id}')"><div class="av" style="width:32px;height:32px;background:var(--gray-100)">${o.icon}</div><div><div class="nm">${esc(o.title)}</div><div class="meta">${esc(o.meta)}</div></div></div>`).join(''):'<div style="padding:22px;text-align:center;color:var(--faint);font-size:13px">🎉 Rien à signaler</div>')+`<div style="padding:10px 14px;border-top:1px solid var(--line-soft)"><button class="btn gh full" style="font-size:12.5px" onclick="enableBrowserNotif()">🔔 Activer les alertes du navigateur</button></div>`;}
@@ -504,8 +533,8 @@ function dashInPeriod(s){if(dashYear==='all'&&dashMonth==='all')return true;cons
 function setDashYear(v){dashYear=v;renderDash();}
 function setDashMonth(v){dashMonth=v;renderDash();}
 function exportExcel(){const rows=[];const csvCell=(v)=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};const push=(...c)=>rows.push(c.map(csvCell).join(';'));
-  const paidAll=state.payments.filter(p=>p.status==='paye'),encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
-  const dueAll=state.payments.filter(p=>p.status!=='paye').reduce((s,p)=>s+(p.amount||0),0);
+  const paidAll=state.payments.filter(p=>p.status==='paye'&&!p.cancelled),encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
+  const dueAll=state.payments.filter(p=>p.status!=='paye'&&!p.cancelled).reduce((s,p)=>s+(p.amount||0),0);
   const maintAll=state.incidents.reduce((s,i)=>s+(i.cost||0),0);
   const occ=state.properties.filter(p=>p.status==='occupe').length,tot=state.properties.length||1;
   push('ImmoGestion - Export du '+new Date().toLocaleDateString('fr-FR'));push('');
@@ -516,11 +545,12 @@ function exportExcel(){const rows=[];const csvCell=(v)=>{v=String(v??'');return 
   push('SINISTRES');push('Titre','Bien','Type','Priorite','Statut','Cout (FCFA)','Reparateur');state.incidents.forEach(i=>{const pr=prop(i.property_id);push(i.title,pr?pr.name:'',i.type,i.priority,i.status,i.cost,i.contractor);});
   const csv='﻿'+rows.join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='immogestion_export_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('Export Excel telecharge ✓');}
 function renderDash(){
-  const occ=state.properties.filter(p=>p.status==='occupe').length, vac=state.properties.filter(p=>p.status==='vacant').length, maint=state.properties.filter(p=>p.status==='maintenance').length, tot=state.properties.length||1;
-  const paidAll=state.payments.filter(p=>p.status==='paye');
+  const actifs=state.properties.filter(p=>!p.archived);
+  const occ=actifs.filter(p=>p.status==='occupe').length, vac=actifs.filter(p=>p.status==='vacant').length, res=actifs.filter(p=>p.status==='reserve').length, prev=actifs.filter(p=>p.status==='preavis').length, maint=actifs.filter(p=>p.status==='maintenance').length, tot=actifs.length||1;
+  const paidAll=state.payments.filter(p=>p.status==='paye'&&!p.cancelled);
   const paid=paidAll.filter(p=>dashInPeriod(p.paid_at||p.created_at)), encaisse=paid.reduce((s,p)=>s+(p.amount||0),0);
   const encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
-  const impayes=state.payments.filter(p=>p.status!=='paye'), dueImp=impayes.reduce((s,p)=>s+(p.amount||0),0);
+  const impayes=state.payments.filter(p=>p.status!=='paye'&&!p.cancelled), dueImp=impayes.reduce((s,p)=>s+(p.amount||0),0);
   const recouvr=encAll+dueImp>0?Math.round(encAll/(encAll+dueImp)*100):100;
   const loyersAttendus=state.contracts.reduce((s,c)=>s+(c.rent_amount||0),0);
   const maintCost=state.incidents.filter(i=>dashInPeriod(i.created_at)).reduce((s,i)=>s+(i.cost||0),0), benefice=encaisse-maintCost;
@@ -528,6 +558,7 @@ function renderDash(){
   let topId=null,topV=0; Object.entries(revByProp).forEach(([k,v])=>{if(v>topV){topV=v;topId=k;}});
   const topBien=topId?prop(topId):null;
   const sinOuverts=state.incidents.filter(i=>i.status!=='cloture').length;
+  const echeRetard=state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+contractSchedule(c).lateTot,0);
   const series={}; const now=new Date();
   for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);series[d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'})]=0;}
   paidAll.forEach(p=>{const k=monthKey(p.paid_at||p.created_at);if(k&&k in series)series[k]+=p.amount;});
@@ -576,6 +607,7 @@ function renderDash(){
       <div class="ins"><div class="spark">📅</div><div class="tag">Loyers attendus / mois</div><div class="big dsp">${fmt(loyersAttendus)} <span style="font-size:12px;color:var(--faint)">FCFA</span></div><div class="d">Sur ${state.contracts.length} contrat(s) actif(s)</div></div>
       <div class="ins"><div class="spark">🏆</div><div class="tag">Bien le plus rentable</div><div class="big dsp" style="font-size:16px">${topBien?esc(topBien.name):'—'}</div><div class="d">${topBien?fmt(topV)+' FCFA encaissés':'Pas encore de données'}</div></div>
       <div class="ins"><div class="spark">⏳</div><div class="tag">Ancienneté moy. des impayés</div><div class="big dsp">${ancMoy} <span style="font-size:12px;color:var(--faint)">jours</span></div><div class="d">Depuis l'enregistrement de l'impayé</div></div>
+      <div class="ins"><div class="spark">📆</div><div class="tag">Échéances en retard</div><div class="big dsp" style="color:${echeRetard>0?'var(--red)':'var(--green-700)'}">${fmt(echeRetard)} <span style="font-size:12px;color:var(--faint)">FCFA</span></div><div class="d">Calcul automatique sur les contrats actifs</div></div>
     </div>
     <div class="charts">
       <div class="card"><div class="hd">Revenus par bien</div><div class="bd"><div class="chartbox"><canvas id="cRevBien"></canvas></div></div></div>
@@ -591,7 +623,7 @@ function renderDash(){
     chRev=new Chart(ctxR,{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:g,borderRadius:8,maxBarThickness:42,borderColor:'rgba(37,99,235,.2)',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:12,titleFont:{size:13,weight:'bold'},bodyFont:{size:12},cornerRadius:8,displayColors:false,callbacks:{label:(c)=>fmt(c.parsed.y)+' FCFA'}}},scales:{y:{ticks:{callback:(v)=>v>=1000?(v/1000)+'k':v,color:'#9ca3af',font:{size:10,weight:'600'}},grid:{color:'#e5e7eb',drawBorder:false}},x:{ticks:{color:'#9ca3af',font:{size:11,weight:'600'}},grid:{display:false}}}}});}
   const ctxRB=$('cRevBien'); if(ctxRB){if(chRevBien)chRevBien.destroy();chRevBien=new Chart(ctxRB,{type:'bar',data:{labels:revBienSorted.map(x=>x[0]),datasets:[{data:revBienSorted.map(x=>x[1]),backgroundColor:'#2563eb',borderRadius:6,maxBarThickness:28}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>fmt(c.parsed.x)+' FCFA'}}},scales:{x:{ticks:{callback:(v)=>v>=1000?(v/1000)+'k':v,color:'#9ca3af',font:{size:10}},grid:{color:'#e5e7eb'}},y:{ticks:{color:'#6b7280',font:{size:10}},grid:{display:false}}}}});}
   const ctxIM=$('cImp'); if(ctxIM){if(chImp)chImp.destroy();const il=Object.keys(impSeries),iv=Object.values(impSeries);chImp=new Chart(ctxIM,{type:'line',data:{labels:il,datasets:[{data:iv,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.12)',fill:true,tension:.35,pointRadius:3,pointBackgroundColor:'#ef4444'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>fmt(c.parsed.y)+' FCFA'}}},scales:{y:{ticks:{callback:(v)=>v>=1000?(v/1000)+'k':v,color:'#9ca3af',font:{size:10}},grid:{color:'#e5e7eb'}},x:{ticks:{color:'#9ca3af',font:{size:10}},grid:{display:false}}}}});}
-  const ctxO=$('cOcc'); if(ctxO){chOcc=new Chart(ctxO,{type:'doughnut',data:{labels:['Occupé','Vacant','Maintenance'],datasets:[{data:[occ,vac,maint],backgroundColor:['#10b981','#f59e0b','#2563eb'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11,weight:'600'},color:'#6b7280',padding:14}},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:10,titleFont:{size:12,weight:'bold'},bodyFont:{size:11},cornerRadius:8,displayColors:false}}}});}
+  const ctxO=$('cOcc'); if(ctxO){chOcc=new Chart(ctxO,{type:'doughnut',data:{labels:['Occupé','Disponible','Réservé','En préavis','Maintenance'],datasets:[{data:[occ,vac,res,prev,maint],backgroundColor:['#10b981','#f59e0b','#2563eb','#d97706','#ef4444'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11,weight:'600'},color:'#6b7280',padding:14}},tooltip:{backgroundColor:'rgba(15,23,42,.9)',padding:10,titleFont:{size:12,weight:'bold'},bodyFont:{size:11},cornerRadius:8,displayColors:false}}}});}
 }
 
 /* ===== BIENS ===== */
@@ -638,28 +670,65 @@ function openEditLoc(id){const t=ten(id);if(!t)return;editLocId=id;locPhotoFile=
 /* ===== CONTRATS ===== */
 function renderContrats(){const l=state.contracts.filter(c=>!!c.archived===showArchived);
   if(!l.length){$('contratsList').innerHTML=archBar()+'<div class="empty"><div class="big">📄</div>'+(showArchived?'Aucun contrat archivé.':'Aucun contrat.')+'</div>';return;}
-  $('contratsList').innerHTML=archBar()+'<div class="tcard">'+l.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">📄</div><div><div class="nm">${esc(pr?pr.name:'Bien supprimé')}</div><div class="meta">${esc(t?t.full_name:'—')} · ${c.start_date||'?'} → ${c.end_date||'?'} · ${fmt(c.rent_amount)} FCFA</div></div>${contractStatusBadge(c)}${c.validated?'<span class="b green" style="margin-left:6px"><span class="d"></span>Validé</span>':'<span class="b amber" style="margin-left:6px"><span class="d"></span>À valider</span>'}<div class="acts"><button class="ibtn" title="Documents du locataire" onclick="viewTenantDocs('${c.tenant_id}')">📎</button>${c.validated?'':`<button class="ibtn green" title="Valider le contrat" onclick="validateContract('${c.id}')">✅</button>`}<button class="ibtn green" data-pdfc="${c.id}" title="Bail PDF">📥</button>${c.archived?`<button class="ibtn" title="Restaurer" onclick="restoreRow('contracts','${c.id}')">↩️</button>`:`<button class="ibtn" title="Archiver" onclick="archiveRow('contracts','${c.id}')">📦</button>`}</div></div>`;}).join('')+'</div>';
+  $('contratsList').innerHTML=archBar()+'<div class="tcard">'+l.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);const sc=contractSchedule(c);const lateB=sc.lateTot>0?`<span class="b red" style="margin-left:6px"><span class="d"></span>${fmt(sc.lateTot)} FCFA en retard</span>`:'';return `<div><div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">📄</div><div><div class="nm">${esc(pr?pr.name:'Bien supprimé')}</div><div class="meta">${esc(t?t.full_name:'—')} · ${c.start_date||'?'} → ${c.end_date||'?'} · ${fmt(c.rent_amount)} FCFA · ${(FREQ[c.frequency]||FREQ.mensuel)[0]}</div></div>${contractStatusBadge(c)}${lateB}${c.validated?'<span class="b green" style="margin-left:6px"><span class="d"></span>Validé</span>':'<span class="b amber" style="margin-left:6px"><span class="d"></span>À valider</span>'}<div class="acts"><button class="ibtn" title="Échéancier" onclick="toggleSched('${c.id}')">📅</button><button class="ibtn" title="Documents du locataire" onclick="viewTenantDocs('${c.tenant_id}')">📎</button>${c.validated?'':`<button class="ibtn green" title="Valider le contrat" onclick="validateContract('${c.id}')">✅</button>`}${c.status==='resilie'?'':`<button class="ibtn red" title="Résilier" onclick="resilierContrat('${c.id}')">⛔</button>`}<button class="ibtn green" data-pdfc="${c.id}" title="Bail PDF">📥</button>${c.archived?`<button class="ibtn" title="Restaurer" onclick="restoreRow('contracts','${c.id}')">↩️</button>`:`<button class="ibtn" title="Archiver" onclick="archiveRow('contracts','${c.id}')">📦</button>`}</div></div><div id="sched-${c.id}" class="hidden" style="padding:2px 16px 14px;border-bottom:1px solid var(--line-soft)">${schedHTML(c,sc)}</div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-pdfc]').forEach(b=>b.onclick=()=>pdfContrat(b.dataset.pdfc));
-  document.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>delRow('contracts',b.dataset.delc,'Contrat'));
 }
-$('addContratBtn').onclick=()=>{if(!state.properties.length||!state.tenants.length){toast('Ajoute d\'abord un bien et un locataire.');return;}$('c_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('c_tenant').innerHTML=state.tenants.map(t=>`<option value="${t.id}">${esc(t.full_name)}</option>`).join('');const p0=state.properties[0];$('c_rent').value=p0?p0.rent_amount:'';$('c_deposit').value=p0?p0.rent_amount*2:'';show('contratModal');};
+function toggleSched(id){const e=$('sched-'+id);if(e)e.classList.toggle('hidden');}
+function schedHTML(c,sc){
+  if(c.status==='brouillon'||c.status==='attente')return '<div class="meta" style="color:var(--faint)">Contrat non actif : pas d\'échéancier généré.</div>';
+  if(!c.start_date)return '<div class="meta" style="color:var(--faint)">Ajoute une date de début pour générer l\'échéancier.</div>';
+  if(!sc.rows.length)return '<div class="meta" style="color:var(--faint)">Aucune échéance encore due.</div>';
+  const t=ten(c.tenant_id);
+  const head=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 10px"><span class="b green">Payé : ${fmt(sc.paidTot)} FCFA</span><span class="b ${sc.remTot>0?'amber':'green'}">Restant : ${fmt(sc.remTot)} FCFA</span>${sc.lateTot>0?`<span class="b red">En retard : ${fmt(sc.lateTot)} FCFA</span>`:''}${sc.credit>0?`<span class="b blue">Avance : ${fmt(sc.credit)} FCFA</span>`:''}</div>`;
+  const rows=sc.rows.map(e=>{const stx=e.remaining<=0?['green','Payé']:(e.late?['red','En retard']:['amber','À venir']);return `<div class="row" style="padding:8px 0"><div><div class="nm" style="font-size:13px">${esc(e.label)}</div><div class="meta">Dû ${fmt(e.due)} · Payé ${fmt(e.paid)}${e.late?` · Retard ${e.days} j${e.penalty?` · Pénalité ${fmt(e.penalty)} FCFA`:''}`:''}</div></div><span class="b ${stx[0]}" style="margin-left:auto"><span class="d"></span>${stx[1]}</span>${e.late&&t&&t.phone?`<button class="ibtn" style="color:#25D366;margin-left:8px" title="Relancer cette échéance" onclick="relanceEcheance('${c.id}',${JSON.stringify(e.label).replace(/"/g,'&quot;')},${e.remaining})">💬</button>`:''}</div>`;}).join('');
+  return head+rows;
+}
+function relanceEcheance(cid,period,amount){const c=contr(cid);if(!c)return;const t=ten(c.tenant_id),pr=prop(c.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, l'échéance de loyer ${period} (${fmt(amount)} FCFA) pour ${pr?pr.name:'votre logement'} reste impayée. Merci de bien vouloir régulariser. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
+async function resilierContrat(id){const c=contr(id);if(!c)return;if(!confirm('Résilier ce contrat ? Le bien redeviendra disponible.\n(Le contrat est conservé dans l\'historique, jamais supprimé.)'))return;let {error}=await sb.from('contracts').update({status:'resilie'}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}await sb.from('properties').update({status:'vacant'}).eq('id',c.property_id);toast('Contrat résilié.');await loadAll();}
+$('addContratBtn').onclick=()=>{if(!state.properties.length||!state.tenants.length){toast('Ajoute d\'abord un bien et un locataire.');return;}$('c_prop').innerHTML=state.properties.filter(p=>!p.archived).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('c_tenant').innerHTML=state.tenants.filter(t=>!t.archived).map(t=>`<option value="${t.id}">${esc(t.full_name)}</option>`).join('');const p0=prop($('c_prop').value);$('c_rent').value=p0?p0.rent_amount:'';$('c_deposit').value=p0?p0.rent_amount*2:'';$('c_freq').value='mensuel';$('c_payday').value=5;$('c_penmode').value='fixe';$('c_penval').value='';$('c_status').value='actif';show('contratModal');};
 $('c_prop').onchange=()=>{const p=prop($('c_prop').value);if(p){$('c_rent').value=p.rent_amount;$('c_deposit').value=p.rent_amount*2;}};
-$('saveContrat').onclick=async()=>{$('saveContrat').disabled=true;const {error}=await sb.from('contracts').insert({property_id:$('c_prop').value,tenant_id:$('c_tenant').value,start_date:$('c_start').value||null,end_date:$('c_end').value||null,rent_amount:parseInt($('c_rent').value)||0,deposit_amount:parseInt($('c_deposit').value)||0,status:'actif'});if(!error)await sb.from('properties').update({status:'occupe'}).eq('id',$('c_prop').value);$('saveContrat').disabled=false;if(error){toast('Erreur : '+error.message);return;}hide('contratModal');toast('Contrat créé ✓');await loadAll();};
+$('saveContrat').onclick=async()=>{
+  const propId=$('c_prop').value, st=$('c_status').value, targetProp=prop(propId);
+  if(st==='actif'&&targetProp){
+    if(targetProp.status==='maintenance'){toast('Ce bien est en maintenance : impossible de l\'attribuer.');return;}
+    if(state.contracts.find(c=>c.property_id===propId&&!c.archived&&c.status==='actif')){toast('Ce bien a déjà un contrat actif. Résilie-le d\'abord.');return;}
+  }
+  $('saveContrat').disabled=true;
+  const payload={property_id:propId,tenant_id:$('c_tenant').value,start_date:$('c_start').value||null,end_date:$('c_end').value||null,rent_amount:parseInt($('c_rent').value)||0,deposit_amount:parseInt($('c_deposit').value)||0,status:st,frequency:$('c_freq').value,payment_day:parseInt($('c_payday').value)||5,penalty_mode:$('c_penmode').value,penalty_value:parseFloat($('c_penval').value)||0};
+  let {error}=await sb.from('contracts').insert(payload);
+  if(error&&/column|schema|frequency|penalty|payment_day|status/i.test(error.message)){const {frequency,payment_day,penalty_mode,penalty_value,status,...basic}=payload;basic.status='actif';({error}=await sb.from('contracts').insert(basic));if(!error)toast('Contrat créé (SQL Phase 1 non appliqué : fréquence/pénalité ignorées).');}
+  if(!error&&st==='actif')await sb.from('properties').update({status:'occupe'}).eq('id',propId);
+  $('saveContrat').disabled=false;
+  if(error){toast('Erreur : '+error.message);return;}
+  hide('contratModal');toast('Contrat créé ✓');await loadAll();
+};
 
 /* ===== PAIEMENTS ===== */
 function renderPay(){const l=state.payments;
   if(!l.length){$('payList').innerHTML='<div class="empty"><div class="big">💳</div>Aucun paiement.</div>';return;}
-  $('payList').innerHTML='<div class="tcard">'+l.map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;const rel=p.status!=='paye'&&t&&t.phone;return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.type)}</span></div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||'')} · <b>${fmt(p.amount)} FCFA</b></div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${p.status==='paye'?`<button class="ibtn green" data-pdfr="${p.id}" title="Quittance PDF">📥</button>`:`<button class="ibtn" title="Facture PDF" onclick="pdfFacture('${p.id}')">📄</button>`}${rel?`<button class="ibtn" style="color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}</div></div>`;}).join('')+'</div>';
+  $('payList').innerHTML='<div class="tcard">'+l.map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=p.cancelled?['red','Annulé']:(PAY[p.status]||PAY.paye);const rel=!p.cancelled&&p.status!=='paye'&&t&&t.phone;const modeLbl=p.mode?(PAYMODE[p.mode]||p.mode):'';return `<div class="trow"${p.cancelled?' style="opacity:.55"':''}><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.type)}</span>${modeLbl?` <span class="b blue">${esc(modeLbl)}</span>`:''}</div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||'')} · <b>${fmt(p.amount)} FCFA</b>${p.cancel_reason?' · '+esc(p.cancel_reason):''}</div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${p.cancelled?'':`${p.status==='paye'?`<button class="ibtn green" data-pdfr="${p.id}" title="Quittance PDF">📥</button>`:`<button class="ibtn" title="Facture PDF" onclick="pdfFacture('${p.id}')">📄</button>`}${rel?`<button class="ibtn" style="color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}<button class="ibtn red" title="Annuler (conserve l'historique)" onclick="cancelPay('${p.id}')">🚫</button>`}</div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-pdfr]').forEach(b=>b.onclick=()=>pdfRecu(b.dataset.pdfr));
-  document.querySelectorAll('[data-delp]').forEach(b=>b.onclick=()=>delRow('payments',b.dataset.delp,'Paiement'));
 }
+async function cancelPay(id){const p=state.payments.find(x=>x.id===id);if(!p)return;const reason=prompt('Raison de l\'annulation ?\n(Le paiement est conservé dans l\'historique, jamais supprimé.)');if(reason===null)return;let {error}=await sb.from('payments').update({cancelled:true,cancel_reason:reason||null,status:'en_attente'}).eq('id',id);if(error&&/column|schema|cancel/i.test(error.message)){toast('Annulation impossible : applique le SQL Phase 1 d\'abord.');return;}if(error){toast('Erreur : '+error.message);return;}toast('Paiement annulé (conservé).');await loadAll();}
 $('addPayBtn').onclick=()=>{if(!state.contracts.length){toast('Crée d\'abord un contrat.');return;}$('p_contract').innerHTML=state.contracts.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<option value="${c.id}">${esc(t?t.full_name:'?')} — ${esc(pr?pr.name:'?')}</option>`;}).join('');const c0=contr($('p_contract').value)||state.contracts[0];$('p_amount').value=c0?c0.rent_amount:'';show('payModal');};
 $('p_contract').onchange=()=>{const c=contr($('p_contract').value);if(c)$('p_amount').value=c.rent_amount;};
-$('savePay').onclick=async()=>{const c=contr($('p_contract').value);if(!c){toast('Choisis un contrat');return;}$('savePay').disabled=true;const status=$('p_status').value;const {error}=await sb.from('payments').insert({contract_id:c.id,tenant_id:c.tenant_id,property_id:c.property_id,type:$('p_type').value,amount:parseInt($('p_amount').value)||0,status,period:$('p_period').value.trim()||null,paid_at:status==='paye'?new Date().toISOString().slice(0,10):null});$('savePay').disabled=false;if(error){toast('Erreur : '+error.message);return;}$('p_period').value='';hide('payModal');toast('Paiement enregistré ✓');await loadAll();};
+$('savePay').onclick=async()=>{const c=contr($('p_contract').value);if(!c){toast('Choisis un contrat');return;}$('savePay').disabled=true;const status=$('p_status').value;const payload={contract_id:c.id,tenant_id:c.tenant_id,property_id:c.property_id,type:$('p_type').value,amount:parseInt($('p_amount').value)||0,status,period:$('p_period').value.trim()||null,paid_at:status==='paye'?new Date().toISOString().slice(0,10):null,mode:$('p_mode').value};
+  let {error}=await sb.from('payments').insert(payload);
+  if(error&&/column|schema|mode/i.test(error.message)){const {mode,...basic}=payload;({error}=await sb.from('payments').insert(basic));}
+  $('savePay').disabled=false;if(error){toast('Erreur : '+error.message);return;}$('p_period').value='';hide('payModal');toast('Paiement enregistré ✓');await loadAll();};
 function relanceWA(id){const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, petit rappel concernant le loyer ${p.period?'de '+p.period:''} d'un montant de ${fmt(p.amount)} FCFA pour ${pr?pr.name:'votre logement'}. Merci de bien vouloir régulariser. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
 
 function relanceExpiration(id){const c=state.contracts.find(x=>x.id===id);if(!c)return;const t=ten(c.tenant_id),pr=prop(c.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, votre bail pour ${pr?pr.name:'votre logement'} arrive à échéance le ${c.end_date}. Merci de nous contacter pour le renouvellement. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
-function contractStatusBadge(c){if(!c.end_date)return '';const days=(new Date(c.end_date)-new Date())/86400000;if(days<0)return '<span class="b red"><span class="d"></span>Expiré</span>';if(days<=30)return '<span class="b amber"><span class="d"></span>Expire bientôt</span>';return '<span class="b green"><span class="d"></span>Actif</span>';}
+function contractStatusBadge(c){
+  if(c.status==='resilie')return '<span class="b red"><span class="d"></span>Résilié</span>';
+  if(c.status==='brouillon')return '<span class="b" style="background:var(--gray-100);color:var(--gray-600)"><span class="d"></span>Brouillon</span>';
+  if(c.status==='attente')return '<span class="b amber"><span class="d"></span>En attente signature</span>';
+  if(!c.end_date)return '<span class="b green"><span class="d"></span>Actif</span>';
+  const days=(new Date(c.end_date)-new Date())/86400000;
+  if(days<0)return '<span class="b red"><span class="d"></span>Expiré</span>';
+  if(days<=30)return '<span class="b amber"><span class="d"></span>Expire bientôt</span>';
+  return '<span class="b green"><span class="d"></span>Actif</span>';
+}
 function waTenant(id){const t=ten(id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');window.open(`https://wa.me/${num}?text=${encodeURIComponent('Bonjour '+(t.full_name||'')+', ')}`,'_blank');}
 function waSinistre(id){const i=state.incidents.find(x=>x.id===id);if(!i)return;const t=ten(i.tenant_id),pr=prop(i.property_id);if(!t||!t.phone){toast('Pas de numéro pour ce locataire');return;}const num=t.phone.replace(/\D/g,'');const st=(SFLOW.find(s=>s[0]===i.status)||SFLOW[0])[1];const msg=`Bonjour ${t.full_name}, concernant le sinistre « ${i.title} »${pr?' au logement '+pr.name:''} : statut actuel « ${st} ». Nous vous tenons informé. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
 /* ===== SINISTRES ===== */
