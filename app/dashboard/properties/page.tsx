@@ -1,10 +1,12 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Users, DollarSign } from "lucide-react";
+import { Plus, MapPin } from "lucide-react";
 
 const properties = [
   { id: 1, name: "Appartement 3BR - Douala", location: "Douala", tenants: 2, price: "250,000 FCFA", occupancy: "Occupée", image: "🏢" },

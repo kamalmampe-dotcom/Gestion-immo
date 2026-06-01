@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Bell, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface Notification {
   id: number;

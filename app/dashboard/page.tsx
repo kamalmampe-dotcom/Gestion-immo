@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { redirect } from "next/navigation";
@@ -10,7 +12,6 @@ import { Building2, Users, DollarSign, AlertCircle } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -22,7 +23,6 @@ export default function Dashboard() {
       if (!user) {
         redirect("/auth/login");
       }
-      setUser(user);
       setLoading(false);
     };
 
@@ -131,7 +131,7 @@ export default function Dashboard() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {occupancyData.map((entry, index) => (
+                  {occupancyData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={colors[index]} />
                   ))}
                 </Pie>
