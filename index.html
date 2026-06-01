@@ -257,6 +257,39 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
 .bldg .grid{border-top:1px solid var(--line-soft);background:var(--gray-50)}
 @media(max-width:600px){.bldg-stats{width:100%;justify-content:space-around;margin:0}}
 
+/* ====== EFFET WAHOU (inspiré SAV Manager) ====== */
+/* Fond ambiant derrière le contenu principal */
+.main{background:radial-gradient(900px 520px at 100% -8%,rgba(37,99,235,.07),transparent 60%),radial-gradient(820px 520px at -12% 105%,rgba(6,182,212,.06),transparent 60%)}
+/* KPI "bento" : filigrane, gros chiffre, icône en relief, survol vivant */
+.kpi{position:relative;overflow:hidden}
+.kpi::after{content:attr(data-wm);position:absolute;right:-8px;bottom:-18px;font-size:86px;line-height:1;opacity:.06;transform:rotate(-12deg);pointer-events:none;transition:transform .45s ease}
+.kpi:hover::after{transform:rotate(-12deg) scale(1.15)}
+.kpi .val{font-size:27px}
+.kpi .ic{box-shadow:0 8px 16px rgba(37,99,235,.18);transition:transform .25s}
+.kpi:hover .ic{transform:scale(1.08) rotate(-4deg)}
+.cup{font-variant-numeric:tabular-nums}
+/* Cartes : survol qui prend vie */
+.card{transition:transform .25s,box-shadow .25s}
+.card:hover{transform:translateY(-3px);box-shadow:var(--sh-lg)}
+/* Hero : reflet animé + profondeur */
+.hero{background:linear-gradient(135deg,var(--primary) 0%,#1d4ed8 55%,#0e7490 120%)}
+.hero::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 32%,rgba(255,255,255,.10) 50%,transparent 68%);transform:translateX(-100%);animation:sheen 7s ease-in-out infinite}
+@keyframes sheen{0%,55%{transform:translateX(-100%)}100%{transform:translateX(120%)}}
+/* Bouton principal : dégradé + balayage lumineux au survol */
+.btn.pri{position:relative;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent-light))}
+.btn.pri::after{content:"";position:absolute;top:0;left:-130%;width:60%;height:100%;background:linear-gradient(110deg,transparent,rgba(255,255,255,.38),transparent);transform:skewX(-20deg);transition:left .55s ease}
+.btn.pri:hover::after{left:150%}
+/* Titres un peu plus marqués */
+.sectit h2{font-size:26px;letter-spacing:-.02em}
+.hero h2{font-size:26px}
+/* Sidebar : liseré d'accent sur l'onglet actif */
+.sidebar .tab{position:relative}
+.sidebar .tab.on::before{content:"";position:absolute;left:6px;top:22%;bottom:22%;width:4px;border-radius:99px;background:linear-gradient(var(--accent),var(--secondary))}
+/* Entrée en fondu des grilles */
+.grid>*{animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+.grid>*:nth-child(2){animation-delay:.04s}.grid>*:nth-child(3){animation-delay:.08s}.grid>*:nth-child(4){animation-delay:.12s}.grid>*:nth-child(5){animation-delay:.16s}.grid>*:nth-child(6){animation-delay:.2s}
+@media(prefers-reduced-motion:reduce){.hero::before{animation:none}.stagger>*,.grid>*{animation:none}}
+
 /* Boutons pilules + cartes plus arrondies (look premium) */
 .btn{border-radius:999px}
 .kpi,.card,.tcard,.pcard,.scard,.ins{border-radius:18px}
@@ -476,6 +509,8 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
 /* ===== ImmoGestion Cameroun — v3 (charts + sinistres + photos) ===== */
 const $=(id)=>document.getElementById(id), show=(id)=>$(id).classList.remove('hidden'), hide=(id)=>$(id).classList.add('hidden');
 const fmt=(n)=>(Number(n)||0).toLocaleString('fr-FR');
+const cup=(v)=>`<span class="cup" data-to="${Math.round(Number(v)||0)}">0</span>`;
+function animateCups(scope){(scope||document).querySelectorAll('.cup[data-to]').forEach(el=>{if(el.dataset.done)return;el.dataset.done='1';const to=parseFloat(el.dataset.to)||0;if(to===0){el.textContent='0';return;}const dur=850,t0=performance.now();const step=(t)=>{const k=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=fmt(Math.round(to*e));if(k<1)requestAnimationFrame(step);};requestAnimationFrame(step);});}
 const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const TYPE_ICON={Appartement:'🏢',Maison:'🏡',Boutique:'🏪',Bureau:'🏬',Immeuble:'🏘️'};
 const STATUS={vacant:['amber','Disponible'],reserve:['blue','Réservé'],occupe:['green','Occupé'],preavis:['gold','En préavis'],maintenance:['red','Maintenance']};
@@ -686,16 +721,16 @@ function renderDash(){
     </div>
     ${(expSoon.length||expired.length)?`<div class="card" style="border-left:4px solid var(--amber);margin-bottom:16px"><div class="bd"><div style="font-weight:700;margin-bottom:6px">⏰ Contrats à surveiller</div>${expired.map(c=>{const pr=prop(c.property_id),tt=ten(c.tenant_id);return `<div class="row"><div class="av" style="background:var(--red-bg);color:var(--red)">⚠️</div><div><div class="nm">${esc(pr?pr.name:'—')} · ${esc(tt?tt.full_name:'—')}</div><div class="meta">Expiré le ${c.end_date}</div></div><span class="b red" style="margin-left:auto"><span class="d"></span>Expiré</span></div>`;}).join('')}${expSoon.map(c=>{const pr=prop(c.property_id),tt=ten(c.tenant_id),days=Math.ceil((new Date(c.end_date)-now)/86400000);return `<div class="row"><div class="av" style="background:var(--amber-bg);color:var(--amber)">⏰</div><div><div class="nm">${esc(pr?pr.name:'—')} · ${esc(tt?tt.full_name:'—')}</div><div class="meta">Expire le ${c.end_date} (dans ${days} j)</div></div>${tt&&tt.phone?`<button class="ibtn" style="margin-left:auto;color:#25D366" onclick="relanceExpiration('${c.id}')">💬</button>`:`<span class="b amber" style="margin-left:auto"><span class="d"></span>Bientôt</span>`}</div>`;}).join('')}</div></div>`:''}
     <div class="kpis stagger">
-      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">💰</div><div class="lbl">Revenus encaissés</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">📈 ${paid.length} paiement(s)</div></div>
-      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📅</div><div class="lbl">Revenus annuels ${yearNow}</div><div class="val dsp">${fmt(revAnnee)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">cumul de l'année</div></div>
-      <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${fmt(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${impayes.length} en attente</div></div>
-      <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🔧</div><div class="lbl">Dépenses maintenance</div><div class="val dsp">${fmt(maintCost)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">réparations</div></div>
-      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📈</div><div class="lbl">Bénéfice net</div><div class="val dsp" style="color:${benefice>=0?'#10b981':'#ef4444'}">${fmt(benefice)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">encaissé − maintenance</div></div>
-      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${Math.round(occ/tot*100)}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${state.properties.length} biens</div></div>
-      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">📅</div><div class="lbl">Loyers attendus / mois</div><div class="val dsp">${fmt(loyersAttendus)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">${state.contracts.length} contrat(s)</div></div>
-      <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
-      <div class="kpi"><div class="ic" style="background:#dbeafe;color:#2563eb">🏢</div><div class="lbl">Biens</div><div class="val dsp">${state.properties.length}</div><div class="tr" style="color:var(--muted)">${occ} occ · ${vac} vac</div></div>
-      <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">⏰</div><div class="lbl">Contrats expirants</div><div class="val dsp">${expSoon.length}</div><div class="tr" style="color:${expired.length?'#ef4444':'var(--muted)'}">${expired.length} expiré(s)</div></div>
+      <div class="kpi" data-wm="💰"><div class="ic" style="background:#dcfce7;color:#10b981">💰</div><div class="lbl">Revenus encaissés</div><div class="val dsp">${cup(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">📈 ${paid.length} paiement(s)</div></div>
+      <div class="kpi" data-wm="📅"><div class="ic" style="background:#dbeafe;color:#2563eb">📅</div><div class="lbl">Revenus annuels ${yearNow}</div><div class="val dsp">${cup(revAnnee)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">cumul de l'année</div></div>
+      <div class="kpi" data-wm="⚠️"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${cup(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${impayes.length} en attente</div></div>
+      <div class="kpi" data-wm="🔧"><div class="ic" style="background:#fef3c7;color:#f59e0b">🔧</div><div class="lbl">Dépenses maintenance</div><div class="val dsp">${cup(maintCost)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">réparations</div></div>
+      <div class="kpi" data-wm="📈"><div class="ic" style="background:#dbeafe;color:#2563eb">📈</div><div class="lbl">Bénéfice net</div><div class="val dsp" style="color:${benefice>=0?'#10b981':'#ef4444'}">${cup(benefice)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">encaissé − maintenance</div></div>
+      <div class="kpi" data-wm="📊"><div class="ic" style="background:#dbeafe;color:#2563eb">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${cup(Math.round(occ/tot*100))}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${state.properties.length} biens</div></div>
+      <div class="kpi" data-wm="📅"><div class="ic" style="background:#dcfce7;color:#10b981">📅</div><div class="lbl">Loyers attendus / mois</div><div class="val dsp">${cup(loyersAttendus)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">${state.contracts.length} contrat(s)</div></div>
+      <div class="kpi" data-wm="🛠️"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${cup(sinOuverts)}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
+      <div class="kpi" data-wm="🏢"><div class="ic" style="background:#dbeafe;color:#2563eb">🏢</div><div class="lbl">Biens</div><div class="val dsp">${cup(state.properties.length)}</div><div class="tr" style="color:var(--muted)">${occ} occ · ${vac} vac</div></div>
+      <div class="kpi" data-wm="⏰"><div class="ic" style="background:#fef3c7;color:#f59e0b">⏰</div><div class="lbl">Contrats expirants</div><div class="val dsp">${cup(expSoon.length)}</div><div class="tr" style="color:${expired.length?'#ef4444':'var(--muted)'}">${expired.length} expiré(s)</div></div>
     </div>
     <div class="charts">
       <div class="card"><div class="hd">Revenus encaissés <span class="mini">6 derniers mois</span></div><div class="bd"><div class="chartbox"><canvas id="cRev"></canvas></div></div></div>
@@ -716,6 +751,7 @@ function renderDash(){
       <div class="card"><div class="hd">Derniers paiements</div><div class="bd">${state.payments.length?state.payments.slice(0,5).map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=PAY[p.status]||PAY.paye;return `<div class="row"><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||p.type)}</div></div><div style="margin-left:auto;text-align:right"><div class="dsp" style="font-weight:700;font-size:13px">${fmt(p.amount)}</div><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span></div></div>`;}).join(''):'<div class="empty" style="padding:22px">Aucun paiement.</div>'}</div></div>
       <div class="card"><div class="hd">À relancer 🔔</div><div class="bd">${impayes.length?impayes.slice(0,5).map(p=>{const t=ten(p.tenant_id);return `<div class="row"><div class="av" style="background:var(--red-bg);color:var(--red)">⚠️</div><div><div class="nm">${esc(t?t.full_name:'—')}</div><div class="meta">${fmt(p.amount)} FCFA · ${esc(p.period||'')}</div></div>${t&&t.phone?`<button class="ibtn" style="margin-left:auto;color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}</div>`;}).join(''):'<div class="empty" style="padding:22px">🎉 Aucun impayé. Tout est à jour !</div>'}</div></div>
     </div>`;
+  animateCups($('view-dash'));
   const labels=Object.keys(series), vals=Object.values(series);
   if(chRev)chRev.destroy(); if(chOcc)chOcc.destroy();
   const ctxR=$('cRev'); if(ctxR){const g=ctxR.getContext('2d').createLinearGradient(0,0,0,240);g.addColorStop(0,'rgba(37,99,235,.85)');g.addColorStop(1,'rgba(37,99,235,.15)');
@@ -987,11 +1023,12 @@ function renderTenantHome(){
     ${nextDue?`<div class="card" style="border-left:4px solid ${nextDue.late?'var(--alert)':'var(--accent)'};margin-bottom:18px"><div class="bd" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div style="font-size:30px">${nextDue.late?'⏰':'📅'}</div><div><div style="font-weight:700">${nextDue.late?'Échéance en retard':'Prochaine échéance'} · ${esc(nextDue.label)}</div><div class="smeta" style="color:var(--muted)">Reste à payer : <b>${fmt(nextDue.remaining)} FCFA</b>${nextDue.late&&nextDue.penalty?` · pénalité éventuelle ${fmt(nextDue.penalty)} FCFA`:''}</div></div></div></div>`:(c?`<div class="card" style="border-left:4px solid var(--success);margin-bottom:18px"><div class="bd">✅ Vous êtes à jour de vos loyers. Merci !</div></div>`:'')}
     ${p?`<div class="grid" style="margin-bottom:16px"><div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b green st"><span class="d"></span>Mon logement</span></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type||'')}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`:'<div class="empty"><div class="big">🏠</div>Aucun logement associé pour le moment. Contactez votre bailleur.</div>'}
     <div class="kpis stagger">
-      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">🏠</div><div class="lbl">Loyer mensuel</div><div class="val dsp">${fmt(c?c.rent_amount:0)} <small>FCFA</small></div></div>
-      <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">✅</div><div class="lbl">Total payé</div><div class="val dsp">${fmt(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">${paid.length} paiement(s)</div></div>
-      <div class="kpi"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Reste à régler</div><div class="val dsp">${fmt(sc.remTot||0)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${sc.lateTot>0?fmt(sc.lateTot)+' en retard':'à jour'}</div></div>
-      <div class="kpi"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${sinOuverts}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
+      <div class="kpi" data-wm="🏠"><div class="ic" style="background:#dcfce7;color:#10b981">🏠</div><div class="lbl">Loyer mensuel</div><div class="val dsp">${cup(c?c.rent_amount:0)} <small>FCFA</small></div></div>
+      <div class="kpi" data-wm="✅"><div class="ic" style="background:#dcfce7;color:#10b981">✅</div><div class="lbl">Total payé</div><div class="val dsp">${cup(encaisse)} <small>FCFA</small></div><div class="tr" style="color:#10b981">${paid.length} paiement(s)</div></div>
+      <div class="kpi" data-wm="⚠️"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Reste à régler</div><div class="val dsp">${cup(sc.remTot||0)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${sc.lateTot>0?fmt(sc.lateTot)+' en retard':'à jour'}</div></div>
+      <div class="kpi" data-wm="🛠️"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${cup(sinOuverts)}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
     </div>`;
+  animateCups($('tview-thome'));
 }
 
 function renderTenantContract(){
