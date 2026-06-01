@@ -24,7 +24,11 @@ create table if not exists profiles (
   phone      text,
   company    text,
   photo_url  text,
+  city       text,
+  cni        text,
+  address    text,
   role       text default 'owner',          -- 'owner' | 'super'
+  active     boolean default true,
   created_at timestamptz default now()
 );
 
@@ -39,6 +43,7 @@ create table if not exists properties (
   rooms       int,
   surface     numeric,
   photo_url   text,
+  parent_id   uuid,                          -- appartement rattaché à un immeuble
   archived    boolean default false,
   created_at  timestamptz default now()
 );
@@ -128,6 +133,7 @@ create table if not exists audit_logs (
 -- 3) COLONNES AJOUTÉES (au cas où les tables existaient déjà sans elles)
 -- ===================================================================
 alter table properties add column if not exists archived           boolean default false;
+alter table properties add column if not exists parent_id          uuid;    -- appartement rattaché à un immeuble
 alter table tenants    add column if not exists profession         text;
 alter table tenants    add column if not exists cni_doc_url        text;
 alter table tenants    add column if not exists profession_doc_url text;
@@ -144,6 +150,11 @@ alter table payments   add column if not exists cancelled          boolean defau
 alter table payments   add column if not exists cancel_reason      text;
 alter table incidents  add column if not exists comments           jsonb   default '[]'::jsonb;
 alter table profiles   add column if not exists role               text    default 'owner';
+alter table profiles   add column if not exists city               text;
+alter table profiles   add column if not exists cni                text;
+alter table profiles   add column if not exists address            text;
+alter table profiles   add column if not exists active             boolean default true;
+alter table contracts  add column if not exists parent_contract_id uuid;    -- avenant rattaché au contrat d'origine
 
 -- ===================================================================
 -- 3bis) Fonction super-admin (créée APRÈS la table profiles)
@@ -169,7 +180,7 @@ alter table audit_logs enable row level security;
 drop policy if exists "profiles self" on profiles;
 create policy "profiles self" on profiles for all
   using (id = auth.uid() or is_super())
-  with check (id = auth.uid());
+  with check (id = auth.uid() or is_super());
 
 -- Biens
 drop policy if exists "properties owner" on properties;
