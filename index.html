@@ -265,6 +265,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
     <button class="tab" data-view="contrats">📄 Contrats</button>
     <button class="tab" data-view="pay">💳 Paiements</button>
     <button class="tab" data-view="sin">🛠️ Sinistres</button>
+    <button class="tab" data-view="journal">📋 Journal</button>
   </div>
   <div class="wrap" id="view-dash"></div>
   <div class="wrap hidden" id="view-biens"><div class="sectit"><h2 class="dsp">Mes biens</h2><button class="btn pri" id="addBienBtn">+ Ajouter un bien</button></div><div id="biensList"><div class="loading">Chargement…</div></div></div>
@@ -272,6 +273,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
   <div class="wrap hidden" id="view-contrats"><div class="sectit"><h2 class="dsp">Contrats de bail</h2><button class="btn pri" id="addContratBtn">+ Générer un contrat</button></div><div id="contratsList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-pay"><div class="sectit"><h2 class="dsp">Paiements</h2><button class="btn pri" id="addPayBtn">+ Enregistrer un paiement</button></div><div id="payList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-sin"><div class="sectit"><h2 class="dsp">Sinistres & maintenance</h2><button class="btn pri" id="addSinBtn">+ Déclarer un sinistre</button></div><div id="sinFilters" style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap"></div><div id="sinList"><div class="loading">Chargement…</div></div></div>
+  <div class="wrap hidden" id="view-journal"><div class="sectit"><h2 class="dsp">Journal d'activité</h2></div><div id="journalList"><div class="loading">Chargement…</div></div></div>
 </div>
 
 <!-- ESPACE LOCATAIRE -->
@@ -430,7 +432,10 @@ const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
 let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list',showArchived=false,myProfile=null,isSuper=false;
-const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[]};
+const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[],audit:[]};
+/* Journal d'audit : trace toutes les actions importantes (defensif si la table n'existe pas encore) */
+async function logAudit(action,entity,entityId,label){try{const r=await sb.from('audit_logs').insert({action,entity,entity_id:entityId||null,label:label||null,actor_email:state.user?state.user.email:null});return r;}catch(e){}}
+const AUDIT_ICON={creation:'➕',modification:'✏️',annulation:'🚫',resiliation:'⛔',paiement:'💳',connexion:'🔑',sinistre:'🛠️',validation:'✅'};
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
 function init(){
@@ -468,26 +473,28 @@ async function openApp(u){state.user=u;hide('splash');hide('auth');hide('setup')
   hide('tenantApp');show('app');
   $('userEmail').textContent=(myProfile&&myProfile.full_name)?myProfile.full_name:u.email;
   const banner=$('superBanner');if(banner)banner.classList.toggle('hidden',!isSuper);
+  if(!state._loggedConn){state._loggedConn=true;logAudit('connexion','session',null,'Connexion de '+(u.email||''));}
   await loadAll();}
 async function loadAll(){
-  const [p,t,c,pay,inc]=await Promise.all([
+  const [p,t,c,pay,inc,aud]=await Promise.all([
     sb.from('properties').select('*').order('created_at',{ascending:false}),
     sb.from('tenants').select('*').order('created_at',{ascending:false}),
     sb.from('contracts').select('*').order('created_at',{ascending:false}),
     sb.from('payments').select('*').order('created_at',{ascending:false}),
     sb.from('incidents').select('*').order('created_at',{ascending:false}),
+    sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(200),
   ]);
-  state.properties=p.data||[];state.tenants=t.data||[];state.contracts=c.data||[];state.payments=pay.data||[];state.incidents=inc.data||[];
+  state.properties=p.data||[];state.tenants=t.data||[];state.contracts=c.data||[];state.payments=pay.data||[];state.incidents=inc.data||[];state.audit=aud.data||[];
   if(inc.error){toast('⚠️ Table Sinistres manquante — fais la Phase Supabase du guide v3.');}
   renderDash();renderBiens();renderLoc();renderContrats();renderPay();renderSin();renderNotifs();checkNewIncidents();
 }
 const prop=(id)=>state.properties.find(x=>x.id===id),ten=(id)=>state.tenants.find(x=>x.id===id),contr=(id)=>state.contracts.find(x=>x.id===id);
 const initials=(n)=>(n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
 
-document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));});
+document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin','journal'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));if(t.dataset.view==='journal')renderJournal();});
 
 /* ===== RECHERCHE GLOBALE ===== */
-function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));}
+function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin','journal'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));if(v==='journal')renderJournal();}
 function goSearch(type,id){$('searchResults').classList.add('hidden');$('globalSearch').value='';if(type==='bien')navTab('biens');else if(type==='loc')navTab('loc');else if(type==='contrat')navTab('contrats');else if(type==='pay')navTab('pay');else if(type==='sin'){navTab('sin');openSin(id);}}
 function renderGlobalSearch(raw){const box=$('searchResults');const q=String(raw||'').trim().toLowerCase();if(q.length<2){box.classList.add('hidden');box.innerHTML='';return;}
   const has=(...vals)=>vals.some(v=>v&&String(v).toLowerCase().includes(q));
@@ -646,7 +653,7 @@ $('saveBien').onclick=async()=>{const name=$('b_name').value.trim();if(!name){to
   if(photoFile){const u=await uploadPhoto(photoFile);if(u)data.photo_url=u;}
   const {error}=editBienId?await sb.from('properties').update(data).eq('id',editBienId):await sb.from('properties').insert(data);
   $('saveBien').disabled=false;if(error){toast('Erreur : '+error.message);return;}
-  ['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_photo').value='';hide('bienModal');toast(editBienId?'Bien modifié ✓':'Bien ajouté ✓');editBienId=null;await loadAll();};
+  ['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_photo').value='';hide('bienModal');toast(editBienId?'Bien modifié ✓':'Bien ajouté ✓');await logAudit(editBienId?'modification':'creation','bien',null,'Bien : '+data.name);editBienId=null;await loadAll();};
 function openEditBien(id){const p=prop(id);if(!p)return;editBienId=id;photoFile=null;$('b_name').value=p.name||'';$('b_type').value=p.type||'Appartement';$('b_city').value=p.city||'';$('b_rent').value=p.rent_amount||'';$('b_status').value=p.status||'vacant';$('b_rooms').value=p.rooms||'';$('b_surface').value=p.surface||'';$('photoPreview').innerHTML=p.photo_url?`<img src="${esc(p.photo_url)}">`:'';$('bienModalTitle').textContent='Modifier le bien';show('bienModal');}
 
 /* ===== LOCATAIRES ===== */
@@ -664,7 +671,7 @@ $('saveLoc').onclick=async()=>{const full_name=$('l_name').value.trim();if(!full
   if(locPhotoFile){const u=await uploadPhoto(locPhotoFile);if(u)data.photo_url=u;}
   const {error}=editLocId?await sb.from('tenants').update(data).eq('id',editLocId):await sb.from('tenants').insert(data);
   $('saveLoc').disabled=false;if(error){toast('Erreur : '+error.message);return;}
-  ['l_name','l_phone','l_cni','l_email'].forEach(i=>$(i).value='');$('l_photo').value='';hide('locModal');toast(editLocId?'Locataire modifié ✓':'Locataire ajouté ✓');editLocId=null;await loadAll();};
+  ['l_name','l_phone','l_cni','l_email'].forEach(i=>$(i).value='');$('l_photo').value='';hide('locModal');toast(editLocId?'Locataire modifié ✓':'Locataire ajouté ✓');await logAudit(editLocId?'modification':'creation','locataire',null,'Locataire : '+data.full_name);editLocId=null;await loadAll();};
 function openEditLoc(id){const t=ten(id);if(!t)return;editLocId=id;locPhotoFile=null;$('l_name').value=t.full_name||'';$('l_phone').value=t.phone||'';$('l_cni').value=t.cni||'';$('l_email').value=t.email||'';$('locPhotoPreview').innerHTML=t.photo_url?`<img src="${esc(t.photo_url)}">`:'';$('locModalTitle').textContent='Modifier le locataire';show('locModal');}
 
 /* ===== CONTRATS ===== */
@@ -684,7 +691,7 @@ function schedHTML(c,sc){
   return head+rows;
 }
 function relanceEcheance(cid,period,amount){const c=contr(cid);if(!c)return;const t=ten(c.tenant_id),pr=prop(c.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, l'échéance de loyer ${period} (${fmt(amount)} FCFA) pour ${pr?pr.name:'votre logement'} reste impayée. Merci de bien vouloir régulariser. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
-async function resilierContrat(id){const c=contr(id);if(!c)return;if(!confirm('Résilier ce contrat ? Le bien redeviendra disponible.\n(Le contrat est conservé dans l\'historique, jamais supprimé.)'))return;let {error}=await sb.from('contracts').update({status:'resilie'}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}await sb.from('properties').update({status:'vacant'}).eq('id',c.property_id);toast('Contrat résilié.');await loadAll();}
+async function resilierContrat(id){const c=contr(id);if(!c)return;if(!confirm('Résilier ce contrat ? Le bien redeviendra disponible.\n(Le contrat est conservé dans l\'historique, jamais supprimé.)'))return;let {error}=await sb.from('contracts').update({status:'resilie'}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}await sb.from('properties').update({status:'vacant'}).eq('id',c.property_id);toast('Contrat résilié.');await logAudit('resiliation','contrat',id,'Résiliation : '+((prop(c.property_id)||{}).name||''));await loadAll();}
 $('addContratBtn').onclick=()=>{if(!state.properties.length||!state.tenants.length){toast('Ajoute d\'abord un bien et un locataire.');return;}$('c_prop').innerHTML=state.properties.filter(p=>!p.archived).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('c_tenant').innerHTML=state.tenants.filter(t=>!t.archived).map(t=>`<option value="${t.id}">${esc(t.full_name)}</option>`).join('');const p0=prop($('c_prop').value);$('c_rent').value=p0?p0.rent_amount:'';$('c_deposit').value=p0?p0.rent_amount*2:'';$('c_freq').value='mensuel';$('c_payday').value=5;$('c_penmode').value='fixe';$('c_penval').value='';$('c_status').value='actif';show('contratModal');};
 $('c_prop').onchange=()=>{const p=prop($('c_prop').value);if(p){$('c_rent').value=p.rent_amount;$('c_deposit').value=p.rent_amount*2;}};
 $('saveContrat').onclick=async()=>{
@@ -700,7 +707,7 @@ $('saveContrat').onclick=async()=>{
   if(!error&&st==='actif')await sb.from('properties').update({status:'occupe'}).eq('id',propId);
   $('saveContrat').disabled=false;
   if(error){toast('Erreur : '+error.message);return;}
-  hide('contratModal');toast('Contrat créé ✓');await loadAll();
+  hide('contratModal');toast('Contrat créé ✓');await logAudit('creation','contrat',null,'Contrat : '+((prop(propId)||{}).name||'')+' / '+((ten($('c_tenant').value)||{}).full_name||''));await loadAll();
 };
 
 /* ===== PAIEMENTS ===== */
@@ -709,13 +716,18 @@ function renderPay(){const l=state.payments;
   $('payList').innerHTML='<div class="tcard">'+l.map(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id),st=p.cancelled?['red','Annulé']:(PAY[p.status]||PAY.paye);const rel=!p.cancelled&&p.status!=='paye'&&t&&t.phone;const modeLbl=p.mode?(PAYMODE[p.mode]||p.mode):'';return `<div class="trow"${p.cancelled?' style="opacity:.55"':''}><div class="av" style="background:var(--green-50);color:var(--green-700)">💳</div><div><div class="nm">${esc(t?t.full_name:'—')} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(p.type)}</span>${modeLbl?` <span class="b blue">${esc(modeLbl)}</span>`:''}</div><div class="meta">${esc(pr?pr.name:'')} · ${esc(p.period||'')} · <b>${fmt(p.amount)} FCFA</b>${p.cancel_reason?' · '+esc(p.cancel_reason):''}</div></div><div class="acts"><span class="b ${st[0]}"><span class="d"></span>${st[1]}</span>${p.cancelled?'':`${p.status==='paye'?`<button class="ibtn green" data-pdfr="${p.id}" title="Quittance PDF">📥</button>`:`<button class="ibtn" title="Facture PDF" onclick="pdfFacture('${p.id}')">📄</button>`}${rel?`<button class="ibtn" style="color:#25D366" onclick="relanceWA('${p.id}')">💬</button>`:''}<button class="ibtn red" title="Annuler (conserve l'historique)" onclick="cancelPay('${p.id}')">🚫</button>`}</div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-pdfr]').forEach(b=>b.onclick=()=>pdfRecu(b.dataset.pdfr));
 }
-async function cancelPay(id){const p=state.payments.find(x=>x.id===id);if(!p)return;const reason=prompt('Raison de l\'annulation ?\n(Le paiement est conservé dans l\'historique, jamais supprimé.)');if(reason===null)return;let {error}=await sb.from('payments').update({cancelled:true,cancel_reason:reason||null,status:'en_attente'}).eq('id',id);if(error&&/column|schema|cancel/i.test(error.message)){toast('Annulation impossible : applique le SQL Phase 1 d\'abord.');return;}if(error){toast('Erreur : '+error.message);return;}toast('Paiement annulé (conservé).');await loadAll();}
+async function cancelPay(id){const p=state.payments.find(x=>x.id===id);if(!p)return;const reason=prompt('Raison de l\'annulation ?\n(Le paiement est conservé dans l\'historique, jamais supprimé.)');if(reason===null)return;let {error}=await sb.from('payments').update({cancelled:true,cancel_reason:reason||null,status:'en_attente'}).eq('id',id);if(error&&/column|schema|cancel/i.test(error.message)){toast('Annulation impossible : applique le SQL Phase 1 d\'abord.');return;}if(error){toast('Erreur : '+error.message);return;}toast('Paiement annulé (conservé).');await logAudit('annulation','paiement',id,'Annulation paiement : '+fmt(p.amount)+' FCFA');await loadAll();}
+function renderJournal(){
+  const l=state.audit||[];
+  if(!l.length){$('journalList').innerHTML='<div class="empty"><div class="big">📋</div>Aucune activité enregistrée pour le moment.<div style="font-size:13px;margin-top:6px">Applique la Phase 2 du fichier SQL-A-COLLER.sql pour activer le journal.</div></div>';return;}
+  $('journalList').innerHTML='<div class="tcard">'+l.map(a=>{const d=new Date(a.created_at);const when=isNaN(d)?'':d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});return `<div class="trow"><div class="av" style="background:var(--gray-100)">${AUDIT_ICON[a.action]||'•'}</div><div><div class="nm">${esc(a.label||a.action)}</div><div class="meta">${esc(a.entity||'')}${a.actor_email?' · '+esc(a.actor_email):''} · ${when}</div></div></div>`;}).join('')+'</div>';
+}
 $('addPayBtn').onclick=()=>{if(!state.contracts.length){toast('Crée d\'abord un contrat.');return;}$('p_contract').innerHTML=state.contracts.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<option value="${c.id}">${esc(t?t.full_name:'?')} — ${esc(pr?pr.name:'?')}</option>`;}).join('');const c0=contr($('p_contract').value)||state.contracts[0];$('p_amount').value=c0?c0.rent_amount:'';show('payModal');};
 $('p_contract').onchange=()=>{const c=contr($('p_contract').value);if(c)$('p_amount').value=c.rent_amount;};
 $('savePay').onclick=async()=>{const c=contr($('p_contract').value);if(!c){toast('Choisis un contrat');return;}$('savePay').disabled=true;const status=$('p_status').value;const payload={contract_id:c.id,tenant_id:c.tenant_id,property_id:c.property_id,type:$('p_type').value,amount:parseInt($('p_amount').value)||0,status,period:$('p_period').value.trim()||null,paid_at:status==='paye'?new Date().toISOString().slice(0,10):null,mode:$('p_mode').value};
   let {error}=await sb.from('payments').insert(payload);
   if(error&&/column|schema|mode/i.test(error.message)){const {mode,...basic}=payload;({error}=await sb.from('payments').insert(basic));}
-  $('savePay').disabled=false;if(error){toast('Erreur : '+error.message);return;}$('p_period').value='';hide('payModal');toast('Paiement enregistré ✓');await loadAll();};
+  $('savePay').disabled=false;if(error){toast('Erreur : '+error.message);return;}$('p_period').value='';hide('payModal');toast('Paiement enregistré ✓');await logAudit('paiement','paiement',null,fmt(payload.amount)+' FCFA · '+payload.type+' ('+(PAYMODE[payload.mode]||payload.mode||'')+')');await loadAll();};
 function relanceWA(id){const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, petit rappel concernant le loyer ${p.period?'de '+p.period:''} d'un montant de ${fmt(p.amount)} FCFA pour ${pr?pr.name:'votre logement'}. Merci de bien vouloir régulariser. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
 
 function relanceExpiration(id){const c=state.contracts.find(x=>x.id===id);if(!c)return;const t=ten(c.tenant_id),pr=prop(c.property_id);if(!t||!t.phone){toast('Pas de numéro');return;}const num=t.phone.replace(/\D/g,'');const msg=`Bonjour ${t.full_name}, votre bail pour ${pr?pr.name:'votre logement'} arrive à échéance le ${c.end_date}. Merci de nous contacter pour le renouvellement. Cordialement.`;window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`,'_blank');}
@@ -770,6 +782,7 @@ $('saveSin').onclick=async()=>{const desc=$('s_desc').value.trim();if(!desc){toa
   const {error}=await sb.from('incidents').insert({property_id:$('s_prop').value,tenant_id,title,description:desc,type:$('s_type').value,priority:$('s_priority').value,status:'declare',photo_before:photo_before||null,comments:cmt});
   $('saveSin').disabled=false;if(error){toast('Erreur : '+error.message);return;}
   $('s_desc').value='';$('s_photo').value='';hide('sinModal');toast('Sinistre déclaré ✓');
+  await logAudit('sinistre','sinistre',null,'Sinistre déclaré ('+author+') : '+title);
   if(role==='tenant')await loadTenant();else{await loadAll();$('sinFilters')&&setSinFilter('all');}};
 function openEditSin(id){const i=state.incidents.find(x=>x.id===id);if(!i)return;editSinId=id;sinPhotoFile=null;$('s_prop').innerHTML=state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('s_prop').value=i.property_id||'';$('s_type').value=i.type||'autre';$('s_priority').value=i.priority||'moyen';$('s_desc').value=i.description||'';$('sinPhotoPreview').innerHTML=i.photo_before?`<img src="${esc(i.photo_before)}">`:'';$('sinModalTitle').textContent='Modifier le sinistre';$('saveSin').textContent='Enregistrer';hide('sinDetail');show('sinModal');}
 let curSin=null;

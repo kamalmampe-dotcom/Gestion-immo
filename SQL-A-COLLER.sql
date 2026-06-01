@@ -17,4 +17,24 @@ alter table payments  add column if not exists mode          text    default 'es
 alter table payments  add column if not exists cancelled     boolean default false;
 alter table payments  add column if not exists cancel_reason text;
 
--- C'est tout pour la Phase 1. Recharge l'application après avoir cliqué "Run".
+-- ---------- PHASE 2 : Traçabilité (journal d'audit) ----------
+
+create table if not exists audit_logs (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid default auth.uid(),
+  actor_email text,
+  action      text,   -- creation | modification | annulation | resiliation | paiement | connexion | sinistre | validation
+  entity      text,   -- bien | locataire | contrat | paiement | sinistre | session
+  entity_id   uuid,
+  label       text,   -- libellé lisible
+  created_at  timestamptz default now()
+);
+alter table audit_logs enable row level security;
+
+-- Chaque bailleur voit/écrit uniquement son journal ; le super-admin voit tout.
+drop policy if exists "audit owner all" on audit_logs;
+create policy "audit owner all" on audit_logs for all
+  using (owner_id = auth.uid() or is_super())
+  with check (owner_id = auth.uid());
+
+-- Recharge l'application après avoir cliqué "Run".
