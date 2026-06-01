@@ -295,6 +295,23 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
   </div><div class="mf"><button class="btn pri" id="savePf">Enregistrer</button></div>
 </div></div>
 
+<!-- MODALE PROFIL LOCATAIRE -->
+<div class="ov hidden" id="tprofModal"><div class="modal">
+  <div class="mh"><h3 class="dsp">Mon profil & documents</h3><button data-close>×</button></div>
+  <div class="mb">
+    <label class="lab">Nom complet</label><input class="inp" id="tp_name" placeholder="Votre nom">
+    <div class="frow"><div><label class="lab">Téléphone</label><input class="inp" id="tp_phone" placeholder="+237 6.. .. .. .."></div><div><label class="lab">Profession</label><input class="inp" id="tp_profession" placeholder="Ex : Enseignant"></div></div>
+    <label class="lab">Pièce d'identité (CNI)</label><div class="photobox" id="tp_cnibox">📄 Ajouter votre CNI<div id="tp_cniPreview"></div></div><input id="tp_cni_file" type="file" accept="image/*" class="hidden">
+    <label class="lab">Justificatif de profession</label><div class="photobox" id="tp_profbox">📄 Ajouter le justificatif<div id="tp_profPreview"></div></div><input id="tp_prof_file" type="file" accept="image/*" class="hidden">
+  </div><div class="mf"><button class="btn pri" id="saveTprof">Enregistrer</button></div>
+</div></div>
+
+<!-- MODALE DOCUMENTS LOCATAIRE (vue bailleur) -->
+<div class="ov hidden" id="docsModal"><div class="modal">
+  <div class="mh"><h3 class="dsp">Documents du locataire</h3><button data-close>×</button></div>
+  <div class="mb" id="docsBody"></div>
+</div></div>
+
 <!-- MODALE BIEN -->
 <div class="ov hidden" id="bienModal"><div class="modal">
   <div class="mh"><h3 class="dsp" id="bienModalTitle">Ajouter un bien</h3><button data-close>×</button></div>
@@ -602,7 +619,7 @@ function openEditLoc(id){const t=ten(id);if(!t)return;editLocId=id;locPhotoFile=
 /* ===== CONTRATS ===== */
 function renderContrats(){const l=state.contracts.filter(c=>!!c.archived===showArchived);
   if(!l.length){$('contratsList').innerHTML=archBar()+'<div class="empty"><div class="big">📄</div>'+(showArchived?'Aucun contrat archivé.':'Aucun contrat.')+'</div>';return;}
-  $('contratsList').innerHTML=archBar()+'<div class="tcard">'+l.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">📄</div><div><div class="nm">${esc(pr?pr.name:'Bien supprimé')}</div><div class="meta">${esc(t?t.full_name:'—')} · ${c.start_date||'?'} → ${c.end_date||'?'} · ${fmt(c.rent_amount)} FCFA</div></div>${contractStatusBadge(c)}<div class="acts"><button class="ibtn green" data-pdfc="${c.id}" title="Bail PDF">📥</button>${c.archived?`<button class="ibtn" title="Restaurer" onclick="restoreRow('contracts','${c.id}')">↩️</button>`:`<button class="ibtn" title="Archiver" onclick="archiveRow('contracts','${c.id}')">📦</button>`}<button class="ibtn red" data-delc="${c.id}">🗑️</button></div></div>`;}).join('')+'</div>';
+  $('contratsList').innerHTML=archBar()+'<div class="tcard">'+l.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<div class="trow"><div class="av" style="background:var(--green-50);color:var(--green-700)">📄</div><div><div class="nm">${esc(pr?pr.name:'Bien supprimé')}</div><div class="meta">${esc(t?t.full_name:'—')} · ${c.start_date||'?'} → ${c.end_date||'?'} · ${fmt(c.rent_amount)} FCFA</div></div>${contractStatusBadge(c)}${c.validated?'<span class="b green" style="margin-left:6px"><span class="d"></span>Validé</span>':'<span class="b amber" style="margin-left:6px"><span class="d"></span>À valider</span>'}<div class="acts"><button class="ibtn" title="Documents du locataire" onclick="viewTenantDocs('${c.tenant_id}')">📎</button>${c.validated?'':`<button class="ibtn green" title="Valider le contrat" onclick="validateContract('${c.id}')">✅</button>`}<button class="ibtn green" data-pdfc="${c.id}" title="Bail PDF">📥</button>${c.archived?`<button class="ibtn" title="Restaurer" onclick="restoreRow('contracts','${c.id}')">↩️</button>`:`<button class="ibtn" title="Archiver" onclick="archiveRow('contracts','${c.id}')">📦</button>`}<button class="ibtn red" data-delc="${c.id}">🗑️</button></div></div>`;}).join('')+'</div>';
   document.querySelectorAll('[data-pdfc]').forEach(b=>b.onclick=()=>pdfContrat(b.dataset.pdfc));
   document.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>delRow('contracts',b.dataset.delc,'Contrat'));
 }
@@ -719,6 +736,7 @@ function renderTenantHome(){
   const sinOuverts=state.incidents.filter(i=>i.status!=='cloture').length;
   $('tview-thome').innerHTML=`
     <div class="hero"><h2 class="dsp">Bonjour 👋</h2><p>Bienvenue dans votre espace locataire.</p></div>
+    <div style="margin-bottom:16px"><button class="btn gh" onclick="openTenantProfile()">👤 Mon profil & documents</button></div>
     ${p?`<div class="grid" style="margin-bottom:16px"><div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b green st"><span class="d"></span>Mon logement</span></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type||'')}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`:'<div class="empty"><div class="big">🏠</div>Aucun logement associé pour le moment. Contactez votre bailleur.</div>'}
     <div class="kpis stagger">
       <div class="kpi"><div class="ic" style="background:#dcfce7;color:#10b981">🏠</div><div class="lbl">Loyer mensuel</div><div class="val dsp">${fmt(c?c.rent_amount:0)} <small>FCFA</small></div></div>
@@ -742,7 +760,9 @@ function renderTenantContract(){
       ${ligne('Fin',c.end_date||'—')}
       ${ligne('Loyer',fmt(c.rent_amount)+' FCFA / mois')}
       ${ligne('Caution',fmt(c.deposit_amount)+' FCFA')}
-    </div></div>`;
+      ${ligne('Validation',c.validated?'<span class="b green"><span class="d"></span>Validé</span>':'<span class="b amber"><span class="d"></span>En attente</span>')}
+    </div></div>
+    ${!c.validated?`<div class="card" style="border-left:4px solid var(--amber);margin-top:12px"><div class="bd"><div style="font-weight:700;margin-bottom:4px">⏳ Contrat en attente de validation</div><div class="smeta" style="color:var(--muted);margin-bottom:10px">Ajoutez votre CNI et un justificatif de profession pour accélérer la validation par votre bailleur.</div><button class="btn pri" onclick="openTenantProfile()">👤 Compléter mon profil</button></div></div>`:''}`;
 }
 
 function renderTenantPay(){
@@ -778,6 +798,16 @@ function openProfile(){if(role==='tenant')return;pfPhotoFile=null;$('pf_name').v
 $('pfphotobox').onclick=()=>$('pf_photo').click();
 $('pf_photo').onchange=(e)=>{pfPhotoFile=e.target.files[0];if(pfPhotoFile){const r=new FileReader();r.onload=()=>$('pfPhotoPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(pfPhotoFile);}};
 $('savePf').onclick=async()=>{$('savePf').disabled=true;const data={id:state.user.id,full_name:$('pf_name').value.trim(),phone:$('pf_phone').value.trim(),company:$('pf_company').value.trim()};if(pfPhotoFile){const u=await uploadPhoto(pfPhotoFile);if(u)data.photo_url=u;}const {error}=await sb.from('profiles').upsert(data);$('savePf').disabled=false;if(error){toast('Erreur : '+error.message);return;}myProfile={...(myProfile||{}),...data};$('userEmail').textContent=data.full_name||state.user.email;hide('profileModal');toast('Profil enregistré ✓');};
+/* ===== PROFIL LOCATAIRE + DOCUMENTS + VALIDATION ===== */
+let tpCniFile=null,tpProfFile=null;
+function openTenantProfile(){if(!myTenant)return;tpCniFile=null;tpProfFile=null;$('tp_name').value=myTenant.full_name||'';$('tp_phone').value=myTenant.phone||'';$('tp_profession').value=myTenant.profession||'';$('tp_cniPreview').innerHTML=myTenant.cni_doc_url?`<img src="${esc(myTenant.cni_doc_url)}">`:'';$('tp_profPreview').innerHTML=myTenant.profession_doc_url?`<img src="${esc(myTenant.profession_doc_url)}">`:'';show('tprofModal');}
+$('tp_cnibox').onclick=()=>$('tp_cni_file').click();
+$('tp_cni_file').onchange=(e)=>{tpCniFile=e.target.files[0];if(tpCniFile){const r=new FileReader();r.onload=()=>$('tp_cniPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(tpCniFile);}};
+$('tp_profbox').onclick=()=>$('tp_prof_file').click();
+$('tp_prof_file').onchange=(e)=>{tpProfFile=e.target.files[0];if(tpProfFile){const r=new FileReader();r.onload=()=>$('tp_profPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(tpProfFile);}};
+$('saveTprof').onclick=async()=>{if(!myTenant)return;$('saveTprof').disabled=true;const data={full_name:$('tp_name').value.trim()||myTenant.full_name,phone:$('tp_phone').value.trim(),profession:$('tp_profession').value.trim()};if(tpCniFile){const u=await uploadPhoto(tpCniFile);if(u)data.cni_doc_url=u;}if(tpProfFile){const u=await uploadPhoto(tpProfFile);if(u)data.profession_doc_url=u;}const {error}=await sb.from('tenants').update(data).eq('id',myTenant.id);$('saveTprof').disabled=false;if(error){toast('Erreur : '+error.message);return;}myTenant={...myTenant,...data};hide('tprofModal');toast('Profil enregistré ✓');await loadTenant();};
+async function validateContract(id){const {error}=await sb.from('contracts').update({validated:true,status:'actif'}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Contrat validé ✓');await loadAll();}
+function viewTenantDocs(tid){const t=ten(tid);if(!t){toast('Locataire introuvable');return;}$('docsBody').innerHTML=`<div class="row"><div class="nm" style="color:var(--muted)">Locataire</div><div style="margin-left:auto;font-weight:700">${esc(t.full_name||'—')}</div></div><div class="row"><div class="nm" style="color:var(--muted)">Profession</div><div style="margin-left:auto;font-weight:700">${esc(t.profession||'Non renseignée')}</div></div><label class="lab" style="margin-top:12px">Pièce d'identité (CNI)</label>${t.cni_doc_url?`<a href="${esc(t.cni_doc_url)}" target="_blank"><img src="${esc(t.cni_doc_url)}" style="width:100%;border-radius:10px;border:1px solid var(--line)"></a>`:'<div class="smeta" style="color:var(--faint)">Non fournie</div>'}<label class="lab" style="margin-top:12px">Justificatif de profession</label>${t.profession_doc_url?`<a href="${esc(t.profession_doc_url)}" target="_blank"><img src="${esc(t.profession_doc_url)}" style="width:100%;border-radius:10px;border:1px solid var(--line)"></a>`:'<div class="smeta" style="color:var(--faint)">Non fourni</div>'}`;show('docsModal');}
 
 /* ===== Chargement a la demande de jsPDF (accelere le demarrage) ===== */
 let _jspdf=null;
