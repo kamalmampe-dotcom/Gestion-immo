@@ -37,4 +37,8 @@ create policy "audit owner all" on audit_logs for all
   using (owner_id = auth.uid() or is_super())
   with check (owner_id = auth.uid());
 
+-- ---------- PHASE 3 : Immeubles (regroupement d'appartements) ----------
+-- Un appartement peut être rattaché à un immeuble (un bien de type 'Immeuble').
+alter table properties add column if not exists parent_id uuid;
+
 -- Recharge l'application après avoir cliqué "Run".

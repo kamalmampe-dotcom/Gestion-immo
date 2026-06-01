@@ -39,6 +39,7 @@ create table if not exists properties (
   rooms       int,
   surface     numeric,
   photo_url   text,
+  parent_id   uuid,                          -- appartement rattaché à un immeuble
   archived    boolean default false,
   created_at  timestamptz default now()
 );
@@ -128,6 +129,7 @@ create table if not exists audit_logs (
 -- 3) COLONNES AJOUTÉES (au cas où les tables existaient déjà sans elles)
 -- ===================================================================
 alter table properties add column if not exists archived           boolean default false;
+alter table properties add column if not exists parent_id          uuid;    -- appartement rattaché à un immeuble
 alter table tenants    add column if not exists profession         text;
 alter table tenants    add column if not exists cni_doc_url        text;
 alter table tenants    add column if not exists profession_doc_url text;

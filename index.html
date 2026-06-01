@@ -246,6 +246,17 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
 .sb-toggle{display:none}
 .sb-backdrop{display:none}
 
+/* Cartes immeuble (regroupement d'appartements) */
+.bldg{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:18px;box-shadow:var(--sh-sm);margin-bottom:18px;overflow:hidden}
+.bldg-hd{display:flex;align-items:center;gap:14px;padding:16px 18px;flex-wrap:wrap}
+.bldg-ic{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent-light));display:grid;place-items:center;font-size:22px;color:#fff;flex-shrink:0}
+.bldg-stats{display:flex;gap:18px;margin-left:auto}
+.bldg-stats div{text-align:center}
+.bldg-stats b{display:block;font-size:18px;font-weight:800;color:var(--ink)}
+.bldg-stats span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.bldg .grid{border-top:1px solid var(--line-soft);background:var(--gray-50)}
+@media(max-width:600px){.bldg-stats{width:100%;justify-content:space-around;margin:0}}
+
 /* Boutons pilules + cartes plus arrondies (look premium) */
 .btn{border-radius:999px}
 .kpi,.card,.tcard,.pcard,.scard,.ins{border-radius:18px}
@@ -392,6 +403,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
     <label class="lab">Nom du bien</label><input class="inp" id="b_name" placeholder="Ex : Villa Bonapriso">
     <div class="frow"><div><label class="lab">Type</label><select class="inp" id="b_type"><option>Appartement</option><option>Maison</option><option>Boutique</option><option>Bureau</option><option>Immeuble</option></select></div><div><label class="lab">Ville / quartier</label><input class="inp" id="b_city" placeholder="Douala, Bonapriso"></div></div>
     <div class="frow"><div><label class="lab">Loyer (FCFA/mois)</label><input class="inp" id="b_rent" type="number" placeholder="450000"></div><div><label class="lab">Statut</label><select class="inp" id="b_status"><option value="vacant">Disponible</option><option value="reserve">Réservé</option><option value="occupe">Occupé</option><option value="preavis">En préavis</option><option value="maintenance">Maintenance</option></select></div></div>
+    <div id="b_parent_row"><label class="lab">Rattacher à un immeuble (optionnel)</label><select class="inp" id="b_parent"><option value="">— Aucun (bien indépendant)</option></select></div>
     <div class="frow"><div><label class="lab">Pièces</label><input class="inp" id="b_rooms" type="number" placeholder="4"></div><div><label class="lab">Surface (m²)</label><input class="inp" id="b_surface" type="number" placeholder="120"></div></div>
   </div><div class="mf"><button class="btn pri" id="saveBien">Enregistrer</button></div>
 </div></div>
@@ -698,27 +710,39 @@ function renderDash(){
 }
 
 /* ===== BIENS ===== */
+function pcardHTML(p){const st=STATUS[p.status]||STATUS.vacant;return `<div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b ${st[0]} st"><span class="d"></span>${st[1]}</span>${p.archived?`<button class="del" data-restbien="${p.id}" title="Restaurer" style="right:86px">↩️</button>`:`<button class="del" data-archbien="${p.id}" title="Archiver" style="right:86px">📦</button>`}<button class="del" data-editbien="${p.id}" title="Modifier" style="right:48px">✏️</button></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type)}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`;}
 function renderBiens(){const l=state.properties.filter(p=>!!p.archived===showArchived);
   if(!l.length){$('biensList').innerHTML=archBar()+'<div class="empty"><div class="big">🏢</div>'+(showArchived?'Aucun bien archivé.':'Aucun bien. Clique « Ajouter un bien ».')+'</div>';return;}
-  $('biensList').innerHTML=archBar()+'<div class="grid">'+l.map(p=>{const st=STATUS[p.status]||STATUS.vacant;return `<div class="pcard"><div class="ph">${p.photo_url?`<img src="${esc(p.photo_url)}">`:(TYPE_ICON[p.type]||'🏢')}<span class="b ${st[0]} st"><span class="d"></span>${st[1]}</span>${p.archived?`<button class="del" data-restbien="${p.id}" title="Restaurer" style="right:86px">↩️</button>`:`<button class="del" data-archbien="${p.id}" title="Archiver" style="right:86px">📦</button>`}<button class="del" data-editbien="${p.id}" title="Modifier" style="right:48px">✏️</button></div><div class="pb"><div class="pt">${esc(p.name)}</div><div class="pc">${esc(p.city||'')} · ${esc(p.type)}</div><div class="pf"><div class="price dsp">${fmt(p.rent_amount)} <small>FCFA/mois</small></div><div class="pc">${p.rooms?p.rooms+'p.':''}${p.surface?' · '+p.surface+'m²':''}</div></div></div></div>`;}).join('')+'</div>';
-  document.querySelectorAll('[data-delbien]').forEach(b=>b.onclick=()=>delRow('properties',b.dataset.delbien,'Bien'));
+  const buildings=l.filter(p=>p.type==='Immeuble');
+  const childrenOf={}; l.forEach(p=>{if(p.parent_id){(childrenOf[p.parent_id]=childrenOf[p.parent_id]||[]).push(p);}});
+  const standalone=l.filter(p=>p.type!=='Immeuble'&&!p.parent_id);
+  let html=archBar();
+  buildings.forEach(b=>{const kids=childrenOf[b.id]||[];const occ=kids.filter(k=>k.status==='occupe').length;const totRent=kids.reduce((s,k)=>s+(Number(k.rent_amount)||0),0);
+    html+=`<div class="bldg"><div class="bldg-hd"><div class="bldg-ic">🏢</div><div style="flex:1;min-width:0"><div class="pt" style="font-size:17px">${esc(b.name)}</div><div class="pc">${esc(b.city||'')} · Immeuble · ${kids.length} appartement(s)</div></div><div class="bldg-stats"><div><b>${kids.length}</b><span>logements</span></div><div><b style="color:var(--success)">${occ}</b><span>occupés</span></div><div><b>${fmt(totRent)}</b><span>FCFA/mois</span></div></div><div class="acts"><button class="ibtn" title="Ajouter un appartement" onclick="openAddUnit('${b.id}')">➕</button><button class="ibtn" title="Modifier l'immeuble" onclick="openEditBien('${b.id}')">✏️</button>${b.archived?`<button class="ibtn" title="Restaurer" onclick="restoreRow('properties','${b.id}')">↩️</button>`:`<button class="ibtn" title="Archiver" onclick="archiveRow('properties','${b.id}')">📦</button>`}<button class="ibtn" title="Afficher/masquer les appartements" onclick="document.getElementById('bk-${b.id}').classList.toggle('hidden')">▾</button></div></div><div id="bk-${b.id}" class="grid" style="padding:14px">${kids.length?kids.map(pcardHTML).join(''):'<div class="empty" style="padding:20px;grid-column:1/-1">Aucun appartement. Clique ➕ pour en ajouter.</div>'}</div></div>`;});
+  if(standalone.length)html+='<div class="grid">'+standalone.map(pcardHTML).join('')+'</div>';
+  $('biensList').innerHTML=html;
   document.querySelectorAll('[data-editbien]').forEach(b=>b.onclick=()=>openEditBien(b.dataset.editbien));
   document.querySelectorAll('[data-archbien]').forEach(b=>b.onclick=()=>archiveRow('properties',b.dataset.archbien));
   document.querySelectorAll('[data-restbien]').forEach(b=>b.onclick=()=>restoreRow('properties',b.dataset.restbien));
 }
-$('addBienBtn').onclick=()=>{editBienId=null;photoFile=null;$('photoPreview').innerHTML='';['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_status').value='vacant';$('bienModalTitle').textContent='Ajouter un bien';show('bienModal');};
+function populateParentSelect(){const sel=$('b_parent');if(!sel)return;const cur=sel.value;sel.innerHTML='<option value="">— Aucun (bien indépendant)</option>'+state.properties.filter(p=>p.type==='Immeuble'&&!p.archived&&p.id!==editBienId).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');sel.value=cur;}
+function toggleParentField(){const row=$('b_parent_row');if(row)row.style.display=($('b_type').value==='Immeuble')?'none':'';}
+function openAddUnit(buildingId){const b=prop(buildingId);editBienId=null;photoFile=null;$('photoPreview').innerHTML='';['b_name','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_type').value='Appartement';$('b_status').value='vacant';$('b_city').value=b?(b.city||''):'';populateParentSelect();$('b_parent').value=buildingId;toggleParentField();$('bienModalTitle').textContent='Ajouter un appartement';show('bienModal');}
+$('addBienBtn').onclick=()=>{editBienId=null;photoFile=null;$('photoPreview').innerHTML='';['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_type').value='Appartement';$('b_status').value='vacant';populateParentSelect();$('b_parent').value='';toggleParentField();$('bienModalTitle').textContent='Ajouter un bien';show('bienModal');};
+$('b_type').onchange=toggleParentField;
 $('photobox').onclick=()=>$('b_photo').click();
 $('b_photo').onchange=(e)=>{photoFile=e.target.files[0];if(photoFile){const r=new FileReader();r.onload=()=>$('photoPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(photoFile);}};
 async function uploadPhoto(file){if(!file)return null;const path=state.user.id+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9.]/g,'_');const up=await sb.storage.from('photos').upload(path,file);if(up.error){toast('Photo non envoyée : '+up.error.message);return null;}return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;}
 async function uploadDoc(file){if(!file)return null;const path=state.user.id+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9.]/g,'_');const up=await sb.storage.from('documents').upload(path,file);if(up.error){toast('Document non envoyé : '+up.error.message);return null;}return path;}
 async function signedDoc(path){if(!path)return null;if(/^https?:/i.test(path))return path;try{const {data}=await sb.storage.from('documents').createSignedUrl(path,3600);return data?data.signedUrl:null;}catch(e){return null;}}
 $('saveBien').onclick=async()=>{const name=$('b_name').value.trim();if(!name){toast('Le nom est requis');return;}$('saveBien').disabled=true;
-  const data={name,type:$('b_type').value,city:$('b_city').value.trim(),rent_amount:parseInt($('b_rent').value)||0,status:$('b_status').value,rooms:parseInt($('b_rooms').value)||null,surface:parseFloat($('b_surface').value)||null};
+  const data={name,type:$('b_type').value,city:$('b_city').value.trim(),rent_amount:parseInt($('b_rent').value)||0,status:$('b_status').value,rooms:parseInt($('b_rooms').value)||null,surface:parseFloat($('b_surface').value)||null,parent_id:($('b_type').value==='Immeuble'?null:($('b_parent').value||null))};
   if(photoFile){const u=await uploadPhoto(photoFile);if(u)data.photo_url=u;}
-  const {error}=editBienId?await sb.from('properties').update(data).eq('id',editBienId):await sb.from('properties').insert(data);
+  let {error}=editBienId?await sb.from('properties').update(data).eq('id',editBienId):await sb.from('properties').insert(data);
+  if(error&&/column|schema|parent_id/i.test(error.message)){const {parent_id,...basic}=data;({error}=editBienId?await sb.from('properties').update(basic).eq('id',editBienId):await sb.from('properties').insert(basic));if(!error)toast('Bien enregistré (SQL immeubles non appliqué : rattachement ignoré).');}
   $('saveBien').disabled=false;if(error){toast('Erreur : '+error.message);return;}
   ['b_name','b_city','b_rent','b_rooms','b_surface'].forEach(i=>$(i).value='');$('b_photo').value='';hide('bienModal');toast(editBienId?'Bien modifié ✓':'Bien ajouté ✓');await logAudit(editBienId?'modification':'creation','bien',null,'Bien : '+data.name);editBienId=null;await loadAll();};
-function openEditBien(id){const p=prop(id);if(!p)return;editBienId=id;photoFile=null;$('b_name').value=p.name||'';$('b_type').value=p.type||'Appartement';$('b_city').value=p.city||'';$('b_rent').value=p.rent_amount||'';$('b_status').value=p.status||'vacant';$('b_rooms').value=p.rooms||'';$('b_surface').value=p.surface||'';$('photoPreview').innerHTML=p.photo_url?`<img src="${esc(p.photo_url)}">`:'';$('bienModalTitle').textContent='Modifier le bien';show('bienModal');}
+function openEditBien(id){const p=prop(id);if(!p)return;editBienId=id;photoFile=null;$('b_name').value=p.name||'';$('b_type').value=p.type||'Appartement';$('b_city').value=p.city||'';$('b_rent').value=p.rent_amount||'';$('b_status').value=p.status||'vacant';$('b_rooms').value=p.rooms||'';$('b_surface').value=p.surface||'';populateParentSelect();$('b_parent').value=p.parent_id||'';toggleParentField();$('photoPreview').innerHTML=p.photo_url?`<img src="${esc(p.photo_url)}">`:'';$('bienModalTitle').textContent='Modifier le bien';show('bienModal');}
 
 /* ===== LOCATAIRES ===== */
 function renderLoc(){const l=state.tenants.filter(t=>!!t.archived===showArchived);
