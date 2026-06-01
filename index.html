@@ -248,8 +248,9 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
       <input id="globalSearch" placeholder="🔍 Rechercher un bien, locataire, contrat…" autocomplete="off" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13px;background:var(--gray-50)">
       <div id="searchResults" class="hidden" style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-lg);max-height:62vh;overflow:auto;z-index:30"></div>
     </div>
-    <div class="right"><div style="position:relative"><button class="ibtn" id="bellBtn" title="Notifications" style="position:relative">🔔<span id="bellBadge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:99px;font-size:10px;font-weight:700;min-width:16px;height:16px;display:grid;place-items:center;padding:0 3px">0</span></button><div id="notifPanel" class="hidden" style="position:absolute;top:calc(100% + 8px);right:0;width:330px;max-width:88vw;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh-lg);max-height:70vh;overflow:auto;z-index:40"></div></div><span class="email" id="userEmail"></span><button class="btn gh" id="logoutBtn" style="padding:9px 14px;font-size:12.5px">Déconnexion</button></div>
+    <div class="right"><div style="position:relative"><button class="ibtn" id="bellBtn" title="Notifications" style="position:relative">🔔<span id="bellBadge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border-radius:99px;font-size:10px;font-weight:700;min-width:16px;height:16px;display:grid;place-items:center;padding:0 3px">0</span></button><div id="notifPanel" class="hidden" style="position:absolute;top:calc(100% + 8px);right:0;width:330px;max-width:88vw;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh-lg);max-height:70vh;overflow:auto;z-index:40"></div></div><button class="btn gh" id="profileBtn" onclick="openProfile()" title="Mon profil" style="padding:9px 12px;font-size:14px">👤</button><span class="email" id="userEmail" style="cursor:pointer" onclick="openProfile()"></span><button class="btn gh" id="logoutBtn" style="padding:9px 14px;font-size:12.5px">Déconnexion</button></div>
   </div>
+  <div id="superBanner" class="hidden" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;padding:8px 20px;font-size:13px;font-weight:600;text-align:center">👑 Mode super-admin — vous voyez les données de tous les bailleurs</div>
   <div class="tabs">
     <button class="tab on" data-view="dash">📊 Tableau de bord</button>
     <button class="tab" data-view="biens">🏢 Biens</button>
@@ -283,6 +284,16 @@ label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:v
   <div class="wrap hidden" id="tview-tpay"></div>
   <div class="wrap hidden" id="tview-tsin"></div>
 </div>
+
+<!-- MODALE PROFIL BAILLEUR -->
+<div class="ov hidden" id="profileModal"><div class="modal">
+  <div class="mh"><h3 class="dsp">Mon profil</h3><button data-close>×</button></div>
+  <div class="mb">
+    <label class="lab">Photo</label><div class="photobox" id="pfphotobox">📷 Photo (optionnel)<div id="pfPhotoPreview"></div></div><input id="pf_photo" type="file" accept="image/*" class="hidden">
+    <label class="lab">Nom complet</label><input class="inp" id="pf_name" placeholder="Votre nom">
+    <div class="frow"><div><label class="lab">Téléphone</label><input class="inp" id="pf_phone" placeholder="+237 6.. .. .. .."></div><div><label class="lab">Société / agence</label><input class="inp" id="pf_company" placeholder="Optionnel"></div></div>
+  </div><div class="mf"><button class="btn pri" id="savePf">Enregistrer</button></div>
+</div></div>
 
 <!-- MODALE BIEN -->
 <div class="ov hidden" id="bienModal"><div class="modal">
@@ -358,7 +369,7 @@ const PAY={paye:['green','Payé'],en_attente:['amber','En attente'],retard:['red
 const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],climatisation:['❄️','Climatisation'],batiment:['🧱','Bâtiment'],autre:['🛠️','Autre']};
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
-let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list',showArchived=false;
+let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list',showArchived=false,myProfile=null,isSuper=false;
 const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[]};
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2600);}
 
@@ -385,9 +396,16 @@ $('logoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload();};
 async function openApp(u){state.user=u;hide('splash');hide('auth');hide('setup');
   // Détection du rôle : si l'email connecté correspond à une fiche locataire -> espace locataire
   let myT=null; try{const{data}=await sb.from('tenants').select('*');if(data)myT=data.find(x=>x.email&&x.email.toLowerCase()===(u.email||'').toLowerCase())||null;}catch(e){}
-  myTenant=myT; role=myTenant?'tenant':'owner';
-  if(role==='tenant'){hide('app');show('tenantApp');$('tUserEmail').textContent=u.email;await loadTenant();}
-  else{hide('tenantApp');show('app');$('userEmail').textContent=u.email;await loadAll();}}
+  if(myT){myTenant=myT;role='tenant';hide('app');show('tenantApp');$('tUserEmail').textContent=u.email;await loadTenant();return;}
+  myTenant=null;role='owner';
+  try{let{data:pr}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
+    if(!pr){await sb.from('profiles').insert({id:u.id});const r=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();pr=r.data;}
+    myProfile=pr;}catch(e){myProfile=null;}
+  isSuper=!!(myProfile&&myProfile.role==='super');
+  hide('tenantApp');show('app');
+  $('userEmail').textContent=(myProfile&&myProfile.full_name)?myProfile.full_name:u.email;
+  const banner=$('superBanner');if(banner)banner.classList.toggle('hidden',!isSuper);
+  await loadAll();}
 async function loadAll(){
   const [p,t,c,pay,inc]=await Promise.all([
     sb.from('properties').select('*').order('created_at',{ascending:false}),
@@ -754,6 +772,12 @@ function archBar(){return `<div style="margin-bottom:14px;display:flex;gap:6px">
 function setArchived(v){showArchived=v;renderBiens();renderLoc();renderContrats();}
 async function archiveRow(table,id){const {error}=await sb.from(table).update({archived:true}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Archivé ✓');await loadAll();}
 async function restoreRow(table,id){const {error}=await sb.from(table).update({archived:false}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Restauré ✓');await loadAll();}
+/* ===== PROFIL BAILLEUR ===== */
+let pfPhotoFile=null;
+function openProfile(){if(role==='tenant')return;pfPhotoFile=null;$('pf_name').value=(myProfile&&myProfile.full_name)||'';$('pf_phone').value=(myProfile&&myProfile.phone)||'';$('pf_company').value=(myProfile&&myProfile.company)||'';$('pfPhotoPreview').innerHTML=(myProfile&&myProfile.photo_url)?`<img src="${esc(myProfile.photo_url)}">`:'';show('profileModal');}
+$('pfphotobox').onclick=()=>$('pf_photo').click();
+$('pf_photo').onchange=(e)=>{pfPhotoFile=e.target.files[0];if(pfPhotoFile){const r=new FileReader();r.onload=()=>$('pfPhotoPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(pfPhotoFile);}};
+$('savePf').onclick=async()=>{$('savePf').disabled=true;const data={id:state.user.id,full_name:$('pf_name').value.trim(),phone:$('pf_phone').value.trim(),company:$('pf_company').value.trim()};if(pfPhotoFile){const u=await uploadPhoto(pfPhotoFile);if(u)data.photo_url=u;}const {error}=await sb.from('profiles').upsert(data);$('savePf').disabled=false;if(error){toast('Erreur : '+error.message);return;}myProfile={...(myProfile||{}),...data};$('userEmail').textContent=data.full_name||state.user.email;hide('profileModal');toast('Profil enregistré ✓');};
 
 /* ===== Chargement a la demande de jsPDF (accelere le demarrage) ===== */
 let _jspdf=null;
@@ -764,7 +788,7 @@ function ensureJsPDF(){
 }
 
 /* ===== PDF ===== */
-const bailleurLabel=()=>role==='owner'?((state.user&&state.user.email)||''):'Votre bailleur';
+const bailleurLabel=()=>role==='owner'?((myProfile&&myProfile.full_name)||(state.user&&state.user.email)||''):'Votre bailleur';
 function pdfHeader(doc){doc.setFillColor(15,23,42);doc.rect(0,0,210,26,'F');doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text('ImmoGestion Cameroun',14,16);doc.setTextColor(20,36,32);doc.setFont('helvetica','normal');}
 async function pdfRecu(id){if(!await ensureJsPDF()){toast('PDF indisponible (connexion ?)');return;}const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);const titre=p.type==='loyer'?'QUITTANCE DE LOYER':'REÇU DE PAIEMENT';doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text(titre,14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+(p.paid_at||new Date().toISOString().slice(0,10)),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',bailleurLabel());line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant paye :',14,y);doc.setTextColor(14,107,64);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Recu genere par ImmoGestion. Signature du bailleur :',14,y);doc.line(150,y,196,y);doc.save(titre.toLowerCase().replace(/ /g,'_')+'.pdf');}
 async function pdfFacture(id){if(!await ensureJsPDF()){toast('PDF indisponible (connexion ?)');return;}const p=state.payments.find(x=>x.id===id);const t=ten(p.tenant_id),pr=prop(p.property_id);const {jsPDF}=window.jspdf;const doc=new jsPDF();pdfHeader(doc);doc.setFontSize(15);doc.setFont('helvetica','bold');doc.text('FACTURE',14,42);doc.setFontSize(10);doc.setFont('helvetica','normal');doc.text('N° '+p.id.slice(0,8).toUpperCase()+'   Date : '+new Date().toISOString().slice(0,10),14,50);let y=64;const line=(k,v)=>{doc.setTextColor(95,111,104);doc.text(k,14,y);doc.setTextColor(20,36,32);doc.setFont('helvetica','bold');doc.text(String(v),70,y);doc.setFont('helvetica','normal');y+=9;};line('Bailleur :',bailleurLabel());line('Locataire :',t?t.full_name:'—');line('Bien :',pr?pr.name:'—');line('Type :',p.type);line('Periode :',p.period||'—');line('Statut :',(PAY[p.status]||PAY.paye)[1]);doc.setDrawColor(231,226,214);doc.line(14,y,196,y);y+=12;doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Montant du :',14,y);doc.setTextColor(194,69,58);doc.setFontSize(16);doc.text(fmt(p.amount)+' FCFA',70,y);doc.setTextColor(20,36,32);y+=24;doc.setFontSize(10);doc.setFont('helvetica','italic');doc.text('Merci de regler avant l echeance. ImmoGestion.',14,y);doc.save('facture_'+p.id.slice(0,8)+'.pdf');}
