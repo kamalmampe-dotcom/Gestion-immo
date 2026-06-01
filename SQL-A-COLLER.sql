@@ -54,4 +54,17 @@ create policy "profiles self" on profiles for all
   using (id = auth.uid() or is_super())
   with check (id = auth.uid() or is_super());
 
+-- ---------- PHASE 5 : Sécurité (validation contrat + désactivation) ----------
+-- Le locataire ne doit pouvoir QUE valider son contrat (pas le modifier).
+drop policy if exists "contracts tenant validate" on contracts;
+create or replace function validate_my_contract(cid uuid) returns void
+  language plpgsql security definer as $$
+begin
+  update contracts set validated = true
+  where id = cid
+    and tenant_id in (select id from tenants where lower(email) = lower(auth.email()));
+end; $$;
+grant execute on function validate_my_contract(uuid) to authenticated;
+-- (la colonne profiles.active a déjà été ajoutée en Phase 4 ; un compte active=false est bloqué à la connexion)
+
 -- Recharge l'application après avoir cliqué "Run".

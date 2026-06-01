@@ -242,10 +242,17 @@ drop policy if exists "incidents tenant insert" on incidents;
 create policy "incidents tenant insert" on incidents for insert
   with check (tenant_id in (select id from tenants where lower(email) = lower(auth.email())));
 
--- Le locataire peut valider son contrat (passe validated à true)
+-- Le locataire peut UNIQUEMENT valider son contrat (pas le modifier).
+-- On retire l'ancienne règle d'update trop large et on passe par une fonction sécurisée.
 drop policy if exists "contracts tenant validate" on contracts;
-create policy "contracts tenant validate" on contracts for update
-  using (tenant_id in (select id from tenants where lower(email) = lower(auth.email())));
+create or replace function validate_my_contract(cid uuid) returns void
+  language plpgsql security definer as $$
+begin
+  update contracts set validated = true
+  where id = cid
+    and tenant_id in (select id from tenants where lower(email) = lower(auth.email()));
+end; $$;
+grant execute on function validate_my_contract(uuid) to authenticated;
 
 -- ===================================================================
 -- 6) TRIGGER : un sinistre déclaré par le locataire reçoit owner_id du bailleur

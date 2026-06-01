@@ -589,6 +589,7 @@ async function openApp(u){state.user=u;hide('splash');hide('auth');hide('setup')
     myProfile=pr;}catch(e){myProfile=null;}
   try{const pj=localStorage.getItem('immo_pendingProfile');if(pj){const pend=JSON.parse(pj);await sb.from('profiles').upsert({id:u.id,...pend});myProfile={...(myProfile||{}),...pend};localStorage.removeItem('immo_pendingProfile');}}catch(e){}
   isSuper=!!(myProfile&&myProfile.role==='super');
+  if(myProfile&&myProfile.active===false){hide('app');hide('tenantApp');show('auth');setAuthMsg('Votre compte a été désactivé. Contactez l\'administrateur.','err');await sb.auth.signOut();return;}
   hide('tenantApp');show('app');
   $('userEmail').textContent=(myProfile&&myProfile.full_name)?myProfile.full_name:u.email;
   {const sba=$('sbAvatar');if(sba)sba.innerHTML=(myProfile&&myProfile.photo_url)?`<img src="${esc(myProfile.photo_url)}">`:'👤';}
@@ -1053,7 +1054,7 @@ function renderTenantContract(){
       ${ligne('Caution',fmt(c.deposit_amount)+' FCFA')}
       ${ligne('Validation',c.validated?'<span class="b green"><span class="d"></span>Validé</span>':'<span class="b amber"><span class="d"></span>En attente</span>')}
     </div></div>
-    ${!c.validated?`<div class="card" style="border-left:4px solid var(--amber);margin-top:12px"><div class="bd"><div style="font-weight:700;margin-bottom:4px">⏳ Contrat en attente de validation</div><div class="smeta" style="color:var(--muted);margin-bottom:10px">Ajoutez votre CNI et un justificatif de profession pour accélérer la validation par votre bailleur.</div><button class="btn pri" onclick="openTenantProfile()">👤 Compléter mon profil</button></div></div>`:''}`;
+    ${!c.validated?`<div class="card" style="border-left:4px solid var(--amber);margin-top:12px"><div class="bd"><div style="font-weight:700;margin-bottom:4px">⏳ Contrat à valider</div><div class="smeta" style="color:var(--muted);margin-bottom:10px">Vérifiez les informations ci-dessus, ajoutez votre CNI/justificatif, puis validez votre contrat.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" onclick="validateMyContract('${c.id}')">✅ Valider mon contrat</button><button class="btn gh" onclick="openTenantProfile()">👤 Mes documents</button></div></div></div>`:''}`;
 }
 
 function renderTenantPay(){
@@ -1098,6 +1099,7 @@ $('tp_profbox').onclick=()=>$('tp_prof_file').click();
 $('tp_prof_file').onchange=(e)=>{tpProfFile=e.target.files[0];if(tpProfFile){const r=new FileReader();r.onload=()=>$('tp_profPreview').innerHTML=`<img src="${r.result}">`;r.readAsDataURL(tpProfFile);}};
 $('saveTprof').onclick=async()=>{if(!myTenant)return;$('saveTprof').disabled=true;const data={full_name:$('tp_name').value.trim()||myTenant.full_name,phone:$('tp_phone').value.trim(),profession:$('tp_profession').value.trim()};if(tpCniFile){const u=await uploadDoc(tpCniFile);if(u)data.cni_doc_url=u;}if(tpProfFile){const u=await uploadDoc(tpProfFile);if(u)data.profession_doc_url=u;}const {error}=await sb.from('tenants').update(data).eq('id',myTenant.id);$('saveTprof').disabled=false;if(error){toast('Erreur : '+error.message);return;}myTenant={...myTenant,...data};hide('tprofModal');toast('Profil enregistré ✓');await loadTenant();};
 async function validateContract(id){const {error}=await sb.from('contracts').update({validated:true,status:'actif'}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Contrat validé ✓');await loadAll();}
+async function validateMyContract(id){let {error}=await sb.rpc('validate_my_contract',{cid:id});if(error&&/function|does not exist|schema/i.test(error.message)){toast('Validation indisponible : applique le SQL sécurité.');return;}if(error){toast('Erreur : '+error.message);return;}toast('Contrat validé ✓ Merci !');await loadTenant();}
 async function viewTenantDocs(tid){const t=ten(tid);if(!t){toast('Locataire introuvable');return;}const cni=await signedDoc(t.cni_doc_url),prof=await signedDoc(t.profession_doc_url);$('docsBody').innerHTML=`<div class="row"><div class="nm" style="color:var(--muted)">Locataire</div><div style="margin-left:auto;font-weight:700">${esc(t.full_name||'—')}</div></div><div class="row"><div class="nm" style="color:var(--muted)">Profession</div><div style="margin-left:auto;font-weight:700">${esc(t.profession||'Non renseignée')}</div></div><label class="lab" style="margin-top:12px">Pièce d'identité (CNI)</label>${cni?`<a href="${cni}" target="_blank"><img src="${cni}" style="width:100%;border-radius:10px;border:1px solid var(--line)"></a>`:'<div class="smeta" style="color:var(--faint)">Non fournie</div>'}<label class="lab" style="margin-top:12px">Justificatif de profession</label>${prof?`<a href="${prof}" target="_blank"><img src="${prof}" style="width:100%;border-radius:10px;border:1px solid var(--line)"></a>`:'<div class="smeta" style="color:var(--faint)">Non fourni</div>'}`;show('docsModal');}
 
 /* ===== Chargement a la demande de jsPDF (accelere le demarrage) ===== */
