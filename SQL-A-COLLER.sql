@@ -67,4 +67,21 @@ end; $$;
 grant execute on function validate_my_contract(uuid) to authenticated;
 -- (la colonne profiles.active a déjà été ajoutée en Phase 4 ; un compte active=false est bloqué à la connexion)
 
+-- ---------- PHASE 6 : Dépenses & charges ----------
+create table if not exists expenses (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid default auth.uid(),
+  property_id uuid,
+  category    text,
+  label       text,
+  amount      numeric default 0,
+  date        date default current_date,
+  created_at  timestamptz default now()
+);
+alter table expenses enable row level security;
+drop policy if exists "expenses owner" on expenses;
+create policy "expenses owner" on expenses for all
+  using (owner_id = auth.uid() or is_super())
+  with check (owner_id = auth.uid() or is_super());
+
 -- Recharge l'application après avoir cliqué "Run".

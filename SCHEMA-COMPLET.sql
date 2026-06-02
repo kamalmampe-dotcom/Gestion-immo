@@ -129,6 +129,17 @@ create table if not exists audit_logs (
   created_at  timestamptz default now()
 );
 
+create table if not exists expenses (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid default auth.uid(),
+  property_id uuid,
+  category    text,
+  label       text,
+  amount      numeric default 0,
+  date        date default current_date,
+  created_at  timestamptz default now()
+);
+
 -- ===================================================================
 -- 3) COLONNES AJOUTÉES (au cas où les tables existaient déjà sans elles)
 -- ===================================================================
@@ -175,6 +186,7 @@ alter table contracts  enable row level security;
 alter table payments   enable row level security;
 alter table incidents  enable row level security;
 alter table audit_logs enable row level security;
+alter table expenses   enable row level security;
 
 -- Profil : chacun le sien (le super voit tout)
 drop policy if exists "profiles self" on profiles;
@@ -217,6 +229,12 @@ drop policy if exists "audit owner all" on audit_logs;
 create policy "audit owner all" on audit_logs for all
   using (owner_id = auth.uid() or is_super())
   with check (owner_id = auth.uid());
+
+-- Dépenses
+drop policy if exists "expenses owner" on expenses;
+create policy "expenses owner" on expenses for all
+  using (owner_id = auth.uid() or is_super())
+  with check (owner_id = auth.uid() or is_super());
 
 -- ===================================================================
 -- 5) PORTAIL LOCATAIRE : le locataire LIT ses lignes + déclare un sinistre

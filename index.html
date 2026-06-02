@@ -350,6 +350,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
       <button class="tab" data-view="loc"><span class="ti">👥</span><span class="tl">Locataires</span></button>
       <button class="tab" data-view="contrats"><span class="ti">📄</span><span class="tl">Contrats</span></button>
       <button class="tab" data-view="pay"><span class="ti">💳</span><span class="tl">Paiements</span></button>
+      <button class="tab" data-view="depenses"><span class="ti">💸</span><span class="tl">Dépenses</span></button>
       <button class="tab" data-view="sin"><span class="ti">🛠️</span><span class="tl">Sinistres</span></button>
       <button class="tab" data-view="docs"><span class="ti">📁</span><span class="tl">Documents</span></button>
       <button class="tab" data-view="journal"><span class="ti">📋</span><span class="tl">Journal</span></button>
@@ -376,6 +377,7 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
   <div class="wrap hidden" id="view-loc"><div class="sectit"><h2 class="dsp">Mes locataires</h2><button class="btn pri" id="addLocBtn">+ Ajouter</button></div><div id="locList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-contrats"><div class="sectit"><h2 class="dsp">Contrats de bail</h2><button class="btn pri" id="addContratBtn">+ Générer un contrat</button></div><div id="contratsList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-pay"><div class="sectit"><h2 class="dsp">Paiements</h2><button class="btn pri" id="addPayBtn">+ Enregistrer un paiement</button></div><div id="payList"><div class="loading">Chargement…</div></div></div>
+  <div class="wrap hidden" id="view-depenses"><div class="sectit"><h2 class="dsp">Dépenses & charges</h2><button class="btn pri" id="addExpBtn">+ Ajouter une dépense</button></div><div id="expList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-sin"><div class="sectit"><h2 class="dsp">Sinistres & maintenance</h2><button class="btn pri" id="addSinBtn">+ Déclarer un sinistre</button></div><div id="sinFilters" style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap"></div><div id="sinList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-docs"><div class="sectit"><h2 class="dsp">Documents</h2></div><input id="docSearch" class="inp" placeholder="🔍 Filtrer les documents…" oninput="renderDocs()" style="max-width:420px"><div id="docsList"><div class="loading">Chargement…</div></div></div>
   <div class="wrap hidden" id="view-journal"><div class="sectit"><h2 class="dsp">Journal d'activité</h2></div><div id="journalList"><div class="loading">Chargement…</div></div></div>
@@ -486,6 +488,16 @@ label.lab{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:v
   </div><div class="mf"><button class="btn pri" id="savePay">Enregistrer</button></div>
 </div></div>
 
+<!-- MODALE DÉPENSE -->
+<div class="ov hidden" id="expModal"><div class="modal">
+  <div class="mh"><h3 class="dsp" id="expModalTitle">Ajouter une dépense</h3><button data-close>×</button></div>
+  <div class="mb">
+    <div class="frow"><div><label class="lab">Catégorie</label><select class="inp" id="e_cat"><option value="taxe">Taxe foncière</option><option value="gardiennage">Gardiennage</option><option value="eau_commune">Eau / électricité commune</option><option value="nettoyage">Nettoyage</option><option value="assurance">Assurance</option><option value="travaux">Travaux</option><option value="gestion">Frais de gestion</option><option value="autre">Autre</option></select></div><div><label class="lab">Montant (FCFA)</label><input class="inp" id="e_amount" type="number" placeholder="50000"></div></div>
+    <div class="frow"><div><label class="lab">Date</label><input class="inp" id="e_date" type="date"></div><div><label class="lab">Bien concerné (optionnel)</label><select class="inp" id="e_prop"></select></div></div>
+    <label class="lab">Libellé / note</label><input class="inp" id="e_label" placeholder="Ex : Taxe foncière 2026">
+  </div><div class="mf"><button class="btn pri" id="saveExp">Enregistrer</button></div>
+</div></div>
+
 <!-- MODALE DÉCLARER SINISTRE -->
 <div class="ov hidden" id="sinModal"><div class="modal">
   <div class="mh"><h3 class="dsp" id="sinModalTitle">Déclarer un sinistre</h3><button data-close>×</button></div>
@@ -546,7 +558,7 @@ const SKIND={plomberie:['💧','Plomberie'],electricite:['⚡','Électricité'],
 const SPRIO={urgent:['red','Urgent'],moyen:['amber','Moyen'],planifie:['blue','Planifié']};
 const SFLOW=[['declare','Déclaré'],['traitement','Traitement'],['intervention','Intervention'],['cloture','Clôturé']];
 let sb=null,isSignup=false,photoFile=null,locPhotoFile=null,sinPhotoFile=null,sinFilter='all',chRev=null,chOcc=null,role='owner',myTenant=null,editBienId=null,editLocId=null,editSinId=null,dashYear='all',dashMonth='all',chRevBien=null,chImp=null,sinView='list',showArchived=false,myProfile=null,isSuper=false;
-const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[],audit:[],profiles:[]};
+const state={user:null,properties:[],tenants:[],contracts:[],payments:[],incidents:[],audit:[],profiles:[],expenses:[]};
 /* Journal d'audit : trace toutes les actions importantes (defensif si la table n'existe pas encore) */
 async function logAudit(action,entity,entityId,label){try{const r=await sb.from('audit_logs').insert({action,entity,entity_id:entityId||null,label:label||null,actor_email:state.user?state.user.email:null});return r;}catch(e){}}
 const AUDIT_ICON={creation:'➕',modification:'✏️',annulation:'🚫',resiliation:'⛔',paiement:'💳',connexion:'🔑',sinistre:'🛠️',validation:'✅'};
@@ -598,7 +610,7 @@ async function openApp(u){state.user=u;hide('splash');hide('auth');hide('setup')
   if(!state._loggedConn){state._loggedConn=true;logAudit('connexion','session',null,'Connexion de '+(u.email||''));}
   await loadAll();}
 async function loadAll(){
-  const [p,t,c,pay,inc,aud,prof]=await Promise.all([
+  const [p,t,c,pay,inc,aud,prof,exp]=await Promise.all([
     sb.from('properties').select('*').order('created_at',{ascending:false}),
     sb.from('tenants').select('*').order('created_at',{ascending:false}),
     sb.from('contracts').select('*').order('created_at',{ascending:false}),
@@ -606,8 +618,9 @@ async function loadAll(){
     sb.from('incidents').select('*').order('created_at',{ascending:false}),
     sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(200),
     sb.from('profiles').select('*'),
+    sb.from('expenses').select('*').order('date',{ascending:false}),
   ]);
-  state.properties=p.data||[];state.tenants=t.data||[];state.contracts=c.data||[];state.payments=pay.data||[];state.incidents=inc.data||[];state.audit=aud.data||[];state.profiles=prof.data||[];
+  state.properties=p.data||[];state.tenants=t.data||[];state.contracts=c.data||[];state.payments=pay.data||[];state.incidents=inc.data||[];state.audit=aud.data||[];state.profiles=prof.data||[];state.expenses=exp.data||[];
   if(inc.error){toast('⚠️ Table Sinistres manquante — fais la Phase Supabase du guide v3.');}
   renderDash();renderBiens();renderLoc();renderContrats();renderPay();renderSin();renderNotifs();checkNewIncidents();
 }
@@ -617,10 +630,10 @@ const initials=(n)=>(n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpper
 function openSidebar(){const s=$('sidebar');if(s)s.classList.add('open');const b=$('sbBackdrop');if(b)b.classList.add('show');}
 function closeSidebar(){const s=$('sidebar');if(s)s.classList.remove('open');const b=$('sbBackdrop');if(b)b.classList.remove('show');}
 $('sbToggle')&&($('sbToggle').onclick=openSidebar);
-document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','sin','docs','journal','users'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));if(t.dataset.view==='journal')renderJournal();if(t.dataset.view==='docs')renderDocs();if(t.dataset.view==='users')renderUsers();closeSidebar();});
+document.querySelectorAll('#app .tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('#app .tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');['dash','biens','loc','contrats','pay','depenses','sin','docs','journal','users'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==t.dataset.view));if(t.dataset.view==='journal')renderJournal();if(t.dataset.view==='docs')renderDocs();if(t.dataset.view==='users')renderUsers();if(t.dataset.view==='depenses')renderExpenses();closeSidebar();});
 
 /* ===== RECHERCHE GLOBALE ===== */
-function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','sin','docs','journal','users'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));if(v==='journal')renderJournal();if(v==='docs')renderDocs();if(v==='users')renderUsers();}
+function navTab(v){document.querySelectorAll('#app .tabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.view===v));['dash','biens','loc','contrats','pay','depenses','sin','docs','journal','users'].forEach(view=>$('view-'+view).classList.toggle('hidden',view!==v));if(v==='journal')renderJournal();if(v==='docs')renderDocs();if(v==='users')renderUsers();if(v==='depenses')renderExpenses();}
 function goSearch(type,id){$('searchResults').classList.add('hidden');$('globalSearch').value='';if(type==='bien')navTab('biens');else if(type==='loc')navTab('loc');else if(type==='contrat')navTab('contrats');else if(type==='pay')navTab('pay');else if(type==='sin'){navTab('sin');openSin(id);}}
 function renderGlobalSearch(raw){const box=$('searchResults');const q=String(raw||'').trim().toLowerCase();if(q.length<2){box.classList.add('hidden');box.innerHTML='';return;}
   const has=(...vals)=>vals.some(v=>v&&String(v).toLowerCase().includes(q));
@@ -669,14 +682,16 @@ function exportExcel(){const rows=[];const csvCell=(v)=>{v=String(v??'');return 
   const paidAll=state.payments.filter(p=>p.status==='paye'&&!p.cancelled),encAll=paidAll.reduce((s,p)=>s+(p.amount||0),0);
   const dueAll=state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+contractSchedule(c).remTot,0);
   const maintAll=state.incidents.reduce((s,i)=>s+(i.cost||0),0);
+  const expAll=(state.expenses||[]).reduce((s,e)=>s+(Number(e.amount)||0),0);
   const rentableX=state.properties.filter(p=>!p.archived&&p.type!=='Immeuble');
   const occ=rentableX.filter(p=>p.status==='occupe').length,tot=rentableX.length||1;
   push('ImmoGestion - Export du '+new Date().toLocaleDateString('fr-FR'));push('');
-  push('INDICATEURS');push('Revenus encaisses (FCFA)',encAll);push('Impayes (FCFA)',dueAll);push('Depenses maintenance (FCFA)',maintAll);push('Benefice net (FCFA)',encAll-maintAll);push('Taux occupation (%)',Math.round(occ/tot*100));push('Sinistres ouverts',state.incidents.filter(i=>i.status!=='cloture').length);push('Nombre de logements',rentableX.length);push('Loyers attendus / mois (FCFA)',state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+(c.rent_amount||0),0));push('');
+  push('INDICATEURS');push('Revenus encaisses (FCFA)',encAll);push('Impayes (FCFA)',dueAll);push('Depenses maintenance (FCFA)',maintAll);push('Autres depenses (FCFA)',expAll);push('Benefice net (FCFA)',encAll-maintAll-expAll);push('Taux occupation (%)',Math.round(occ/tot*100));push('Sinistres ouverts',state.incidents.filter(i=>i.status!=='cloture').length);push('Nombre de logements',rentableX.length);push('Loyers attendus / mois (FCFA)',state.contracts.filter(c=>!c.archived&&c.status!=='resilie').reduce((s,c)=>s+(c.rent_amount||0),0));push('');
   push('BIENS');push('Nom','Type','Ville','Loyer (FCFA)','Statut','Pieces','Surface (m2)');state.properties.forEach(p=>push(p.name,p.type,p.city,p.rent_amount,p.status,p.rooms,p.surface));push('');
   push('LOCATAIRES');push('Nom','Telephone','Email','CNI');state.tenants.forEach(t=>push(t.full_name,t.phone,t.email,t.cni));push('');
   push('PAIEMENTS');push('Locataire','Bien','Type','Montant (FCFA)','Statut','Periode','Paye le');state.payments.forEach(p=>{const t=ten(p.tenant_id),pr=prop(p.property_id);push(t?t.full_name:'',pr?pr.name:'',p.type,p.amount,(PAY[p.status]||['','?'])[1],p.period,p.paid_at);});push('');
-  push('SINISTRES');push('Titre','Bien','Type','Priorite','Statut','Cout (FCFA)','Reparateur');state.incidents.forEach(i=>{const pr=prop(i.property_id);push(i.title,pr?pr.name:'',i.type,i.priority,i.status,i.cost,i.contractor);});
+  push('SINISTRES');push('Titre','Bien','Type','Priorite','Statut','Cout (FCFA)','Reparateur');state.incidents.forEach(i=>{const pr=prop(i.property_id);push(i.title,pr?pr.name:'',i.type,i.priority,i.status,i.cost,i.contractor);});push('');
+  push('DEPENSES');push('Date','Categorie','Libelle','Bien','Montant (FCFA)');(state.expenses||[]).forEach(e=>{const pr=e.property_id?prop(e.property_id):null;push(e.date,(EXP_CAT[e.category]||e.category),e.label,pr?pr.name:'',e.amount);});
   const csv='﻿'+rows.join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='immogestion_export_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('Export Excel telecharge ✓');}
 function renderDash(){
   const actifs=state.properties.filter(p=>!p.archived);
@@ -691,7 +706,9 @@ function renderDash(){
   const impayes=dueList, dueImp=dueList.reduce((s,x)=>s+x.amount,0);
   const recouvr=encAll+dueImp>0?Math.round(encAll/(encAll+dueImp)*100):100;
   const loyersAttendus=activeContracts.reduce((s,c)=>s+(c.rent_amount||0),0);
-  const maintCost=state.incidents.filter(i=>dashInPeriod(i.created_at)).reduce((s,i)=>s+(i.cost||0),0), benefice=encaisse-maintCost;
+  const maintCost=state.incidents.filter(i=>dashInPeriod(i.created_at)).reduce((s,i)=>s+(i.cost||0),0);
+  const expCost=(state.expenses||[]).filter(e=>dashInPeriod(e.date)).reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const benefice=encaisse-maintCost-expCost;
   const revByProp={}; paidAll.forEach(p=>{revByProp[p.property_id]=(revByProp[p.property_id]||0)+p.amount;});
   let topId=null,topV=0; Object.entries(revByProp).forEach(([k,v])=>{if(v>topV){topV=v;topId=k;}});
   const topBien=topId?prop(topId):null;
@@ -732,7 +749,7 @@ function renderDash(){
       <div class="kpi" data-wm="📅"><div class="ic" style="background:#dbeafe;color:#2563eb">📅</div><div class="lbl">Revenus annuels ${yearNow}</div><div class="val dsp">${cup(revAnnee)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">cumul de l'année</div></div>
       <div class="kpi" data-wm="⚠️"><div class="ic" style="background:#fee2e2;color:#ef4444">⚠️</div><div class="lbl">Impayés</div><div class="val dsp">${cup(dueImp)} <small>FCFA</small></div><div class="tr" style="color:#ef4444">${dueList.length} échéance(s) due(s)</div></div>
       <div class="kpi" data-wm="🔧"><div class="ic" style="background:#fef3c7;color:#f59e0b">🔧</div><div class="lbl">Dépenses maintenance</div><div class="val dsp">${cup(maintCost)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">réparations</div></div>
-      <div class="kpi" data-wm="📈"><div class="ic" style="background:#dbeafe;color:#2563eb">📈</div><div class="lbl">Bénéfice net</div><div class="val dsp" style="color:${benefice>=0?'#10b981':'#ef4444'}">${cup(benefice)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">encaissé − maintenance</div></div>
+      <div class="kpi" data-wm="📈"><div class="ic" style="background:#dbeafe;color:#2563eb">📈</div><div class="lbl">Bénéfice net</div><div class="val dsp" style="color:${benefice>=0?'#10b981':'#ef4444'}">${cup(benefice)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">encaissé − maintenance − dépenses</div></div>
       <div class="kpi" data-wm="📊"><div class="ic" style="background:#dbeafe;color:#2563eb">📊</div><div class="lbl">Taux d'occupation</div><div class="val dsp">${cup(Math.round(occ/tot*100))}<small>%</small></div><div class="tr" style="color:var(--muted)">${occ}/${rentable.length} logements</div></div>
       <div class="kpi" data-wm="📅"><div class="ic" style="background:#dcfce7;color:#10b981">📅</div><div class="lbl">Loyers attendus / mois</div><div class="val dsp">${cup(loyersAttendus)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">${state.contracts.length} contrat(s)</div></div>
       <div class="kpi" data-wm="🛠️"><div class="ic" style="background:#fef3c7;color:#f59e0b">🛠️</div><div class="lbl">Sinistres ouverts</div><div class="val dsp">${cup(sinOuverts)}</div><div class="tr" style="color:var(--muted)">${state.incidents.length} au total</div></div>
@@ -915,6 +932,22 @@ function renderUsers(){
 }
 async function changeUserRole(id,role){if(id===state.user.id){toast('Vous ne pouvez pas changer votre propre rôle.');return;}const {error}=await sb.from('profiles').update({role}).eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Rôle mis à jour ✓');await logAudit('modification','utilisateur',id,'Rôle → '+role);await loadAll();renderUsers();}
 async function toggleUserActive(id,cur){const {error}=await sb.from('profiles').update({active:!cur}).eq('id',id);if(error&&/column|schema|active/i.test(error.message)){toast('Action impossible : applique le SQL super-admin (colonne active).');return;}if(error){toast('Erreur : '+error.message);return;}toast(cur?'Compte désactivé':'Compte réactivé');await logAudit('modification','utilisateur',id,cur?'Désactivé':'Réactivé');await loadAll();renderUsers();}
+
+/* ===== DÉPENSES & CHARGES ===== */
+const EXP_CAT={taxe:'Taxe foncière',gardiennage:'Gardiennage',eau_commune:'Eau/élec commune',nettoyage:'Nettoyage',assurance:'Assurance',travaux:'Travaux',gestion:'Frais de gestion',autre:'Autre'};
+const EXP_ICON={taxe:'🏛️',gardiennage:'👮',eau_commune:'💡',nettoyage:'🧹',assurance:'🛡️',travaux:'🔨',gestion:'📋',autre:'•'};
+let editExpId=null;
+function renderExpenses(){
+  const l=state.expenses||[];
+  const tot=l.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const head=`<div class="kpis" style="margin-bottom:16px"><div class="kpi" data-wm="💸"><div class="ic" style="background:#fee2e2;color:#ef4444">💸</div><div class="lbl">Total des dépenses</div><div class="val dsp">${fmt(tot)} <small>FCFA</small></div><div class="tr" style="color:var(--muted)">${l.length} ligne(s)</div></div></div>`;
+  if(!l.length){$('expList').innerHTML=head+'<div class="empty"><div class="big">💸</div>Aucune dépense enregistrée.<div style="font-size:13px;margin-top:6px">(Si rien ne s\'enregistre, applique le SQL Dépenses.)</div></div>';return;}
+  $('expList').innerHTML=head+'<div class="tcard">'+l.map(e=>{const pr=e.property_id?prop(e.property_id):null;return `<div class="trow"><div class="av" style="background:var(--gray-100)">${EXP_ICON[e.category]||'•'}</div><div><div class="nm">${esc(e.label||EXP_CAT[e.category]||e.category)} <span class="b" style="background:var(--paper);color:var(--muted)">${esc(EXP_CAT[e.category]||e.category)}</span></div><div class="meta">${e.date||''}${pr?' · '+esc(pr.name):''} · <b>${fmt(e.amount)} FCFA</b></div></div><div class="acts"><button class="ibtn" title="Modifier" onclick="openExpenseModal('${e.id}')">✏️</button><button class="ibtn red" title="Supprimer" onclick="delExpense('${e.id}')">🗑️</button></div></div>`;}).join('')+'</div>';
+}
+function openExpenseModal(id){editExpId=id||null;const e=id?state.expenses.find(x=>x.id===id):null;$('e_prop').innerHTML='<option value="">— Aucun (charge générale)</option>'+state.properties.filter(p=>!p.archived).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('e_cat').value=e?e.category:'taxe';$('e_amount').value=e?e.amount:'';$('e_date').value=e?(e.date||''):new Date().toISOString().slice(0,10);$('e_prop').value=e?(e.property_id||''):'';$('e_label').value=e?(e.label||''):'';$('expModalTitle').textContent=id?'Modifier la dépense':'Ajouter une dépense';show('expModal');}
+$('addExpBtn').onclick=()=>openExpenseModal(null);
+$('saveExp').onclick=async()=>{const amount=parseInt($('e_amount').value)||0;if(amount<=0){toast('Le montant doit être supérieur à 0.');return;}$('saveExp').disabled=true;const data={category:$('e_cat').value,amount,date:$('e_date').value||new Date().toISOString().slice(0,10),property_id:$('e_prop').value||null,label:$('e_label').value.trim()||null};let {error}=editExpId?await sb.from('expenses').update(data).eq('id',editExpId):await sb.from('expenses').insert(data);$('saveExp').disabled=false;if(error){toast(/expenses|relation|table|schema/i.test(error.message)?'Table Dépenses manquante : applique le SQL.':'Erreur : '+error.message);return;}hide('expModal');toast(editExpId?'Dépense modifiée ✓':'Dépense ajoutée ✓');await logAudit(editExpId?'modification':'creation','depense',null,(EXP_CAT[data.category]||'Dépense')+' '+fmt(amount)+' FCFA');editExpId=null;await loadAll();}
+async function delExpense(id){if(!confirm('Supprimer cette dépense ?'))return;const {error}=await sb.from('expenses').delete().eq('id',id);if(error){toast('Erreur : '+error.message);return;}toast('Dépense supprimée');await loadAll();}
 $('addPayBtn').onclick=()=>{if(!state.contracts.length){toast('Crée d\'abord un contrat.');return;}$('p_contract').innerHTML=state.contracts.map(c=>{const pr=prop(c.property_id),t=ten(c.tenant_id);return `<option value="${c.id}">${esc(t?t.full_name:'?')} — ${esc(pr?pr.name:'?')}</option>`;}).join('');const c0=contr($('p_contract').value)||state.contracts[0];$('p_amount').value=c0?c0.rent_amount:'';show('payModal');};
 $('p_contract').onchange=()=>{const c=contr($('p_contract').value);if(c)$('p_amount').value=c.rent_amount;};
 $('savePay').onclick=async()=>{const c=contr($('p_contract').value);if(!c){toast('Choisis un contrat');return;}if((parseInt($('p_amount').value)||0)<=0){toast('Le montant doit être supérieur à 0.');return;}$('savePay').disabled=true;const status=$('p_status').value;const payload={contract_id:c.id,tenant_id:c.tenant_id,property_id:c.property_id,type:$('p_type').value,amount:parseInt($('p_amount').value)||0,status,period:$('p_period').value.trim()||null,paid_at:status==='paye'?new Date().toISOString().slice(0,10):null,mode:$('p_mode').value};
