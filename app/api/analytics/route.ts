@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     // Property filter for future use
     // const propertyId = searchParams.get('propertyId');
-    const timeRange = searchParams.get('timeRange') || '30d';
+    // const timeRange = searchParams.get('timeRange') || '30d';
 
     // Mock analytics calculation
     const metrics = {

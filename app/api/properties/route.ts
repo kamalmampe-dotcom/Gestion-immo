@@ -22,8 +22,8 @@ let properties: any[] = [
 export async function GET(request: NextRequest) {
   try {
     // Add filtering, pagination, etc.
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
+    const url = new URL(request.url);
+    const type = url.searchParams.get('type');
     
     let filtered = properties;
     if (type) {

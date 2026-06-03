@@ -1,221 +1,302 @@
-'use client';
+"use client";
 
-import React, { useEffect } from 'react';
-import { usePropertyStore } from '@/lib/stores/property.store';
-import { useAnalyticsStore } from '@/lib/stores/analytics.store';
-import { StatCard } from '@/components/premium/stat-card';
-import { ChartContainer } from '@/components/premium/chart-container';
-import { DataTable, Column } from '@/components/premium/data-table';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { Building2, Users, TrendingUp, AlertCircle, DollarSign, Home } from 'lucide-react';
-import { useProperties } from '@/lib/api/hooks';
-
-const COLORS = ['#5d6dff', '#1897cc', '#22c55e', '#f59e0b'];
+import React, { useEffect } from "react";
+import { motion } from "framer-motion";
+import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Home, Users, DollarSign, AlertCircle, TrendingUp } from "lucide-react";
+import { DashboardShell } from "@/components/premium/DashboardShell";
+import { PremiumCard, CardHeader, CardTitle, CardDescription } from "@/components/premium/PremiumCard";
+import { StatsCard } from "@/components/premium/StatsCard";
+import { DataTable } from "@/components/premium/DataTable";
+import { PremiumButton } from "@/components/premium/PremiumButton";
+import { usePropertyStore } from "@/lib/stores/propertyStore";
+import { useAnalyticsStore } from "@/lib/stores/analyticsStore";
 
 export default function PremiumDashboard() {
-  const properties = usePropertyStore((s) => s.properties);
-  const metrics = useAnalyticsStore((s) => s.metrics);
-  const insights = useAnalyticsStore((s) => s.insights);
-  const calculateMetrics = useAnalyticsStore((s) => s.calculateMetrics);
-  const generateInsights = useAnalyticsStore((s) => s.generateInsights);
+  const { properties, tenants, payments, maintenance } = usePropertyStore();
+  const { analytics, calculateAnalytics, generateMetrics, detectAnomalies, metrics, anomalies } = useAnalyticsStore();
 
   useEffect(() => {
-    if (properties.length > 0) {
-      calculateMetrics(properties, []);
-      generateInsights();
-    }
-  }, [properties, calculateMetrics, generateInsights]);
+    calculateAnalytics(properties, payments, maintenance, tenants);
+    generateMetrics();
+    detectAnomalies();
+  }, [properties, tenants, payments, maintenance]);
 
-  // Mock data
-  const revenueData = [
-    { month: 'Jan', revenue: 45000, expenses: 32000 },
-    { month: 'Feb', revenue: 52000, expenses: 35000 },
-    { month: 'Mar', revenue: 48000, expenses: 33000 },
-    { month: 'Apr', revenue: 61000, expenses: 38000 },
-    { month: 'May', revenue: 55000, expenses: 36000 },
-    { month: 'Jun', revenue: 67000, expenses: 40000 },
-  ];
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  };
+
+  const revenueData = metrics.slice(-6).map((m) => ({
+    date: new Date(m.date).toLocaleDateString("fr-FR", { month: "short", day: "numeric" }),
+    revenue: m.revenue / 1000,
+    expenses: m.expenses / 1000,
+  }));
 
   const occupancyData = [
-    { name: 'Occupied', value: 85 },
-    { name: 'Vacant', value: 15 },
+    { name: "Occupées", value: properties.filter((p) => p.status === "occupied").length },
+    { name: "Libres", value: properties.filter((p) => p.status !== "occupied").length },
+  ];
+
+  const propertyColumns = [
+    { key: "name" as const, label: "Propriété", width: "180px" },
+    { key: "city" as const, label: "Ville", width: "120px" },
+    { 
+      key: "type" as const, 
+      label: "Type", 
+      width: "100px",
+      render: (v: string) => {
+        const types: Record<string, string> = {
+          apartment: "Appartement",
+          house: "Maison",
+          commercial: "Commercial",
+          land: "Terrain"
+        };
+        return types[v] || v;
+      }
+    },
+    { 
+      key: "currentValue" as const, 
+      label: "Valeur", 
+      width: "120px",
+      render: (v: number) => `${(v / 1000000).toFixed(1)}M FCFA` 
+    },
+    { 
+      key: "status" as const, 
+      label: "Statut", 
+      width: "110px",
+      render: (v: string) => (
+        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+          v === "occupied"
+            ? "bg-green-100 text-green-800"
+            : "bg-gray-100 text-gray-800"
+        }`}>
+          {v === "occupied" ? "Occupée" : "Libre"}
+        </span>
+      ),
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <div className="border-b border-gray-200 bg-white px-6 py-8 shadow-sm">
-        <h1 className="text-3xl font-bold text-gray-900">Property Dashboard</h1>
-        <p className="mt-2 text-gray-600">Real-time insights into your portfolio performance</p>
-      </div>
+    <DashboardShell>
+      <motion.div
+        className="space-y-8 max-w-7xl"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants}>
+          <h1 className="text-3xl font-bold text-gray-900">Tableau de Bord</h1>
+          <p className="mt-2 text-gray-600">Vue d&apos;ensemble de votre portefeuille immobilier</p>
+        </motion.div>
 
-      {/* Main content */}
-      <div className="space-y-6 p-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Total Revenue"
-            value={metrics?.totalRevenue ? `$${(metrics.totalRevenue / 1000).toFixed(0)}k` : '$0'}
-            change={12}
-            trend="up"
-            color="primary"
-            icon={<DollarSign className="h-6 w-6" />}
-          />
-          <StatCard
-            label="Properties"
-            value={metrics?.propertyCount || 0}
-            change={5}
-            trend="up"
-            color="accent"
-            icon={<Building2 className="h-6 w-6" />}
-          />
-          <StatCard
-            label="Active Tenants"
-            value={metrics?.tenantCount || 0}
-            change={3}
-            trend="up"
-            color="success"
-            icon={<Users className="h-6 w-6" />}
-          />
-          <StatCard
-            label="Occupancy Rate"
-            value={metrics?.occupancyRate ? `${(metrics.occupancyRate * 100).toFixed(0)}%` : '0%'}
-            change={-2}
-            trend="down"
-            color="warning"
-            icon={<Home className="h-6 w-6" />}
-          />
-        </div>
+        {/* Stats Grid */}
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          variants={containerVariants}
+        >
+          <motion.div variants={itemVariants}>
+            <StatsCard
+              title="Propriétés"
+              value={properties.length}
+              description={`${properties.filter((p) => p.status === "occupied").length} occupées`}
+              change={8}
+              trend="up"
+              icon={<Home className="w-6 h-6" />}
+              variant="primary"
+            />
+          </motion.div>
 
-        {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ChartContainer
-            title="Revenue Trend"
-            description="Monthly revenue vs expenses"
-            trend={15}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#5d6dff" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#5d6dff" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#5d6dff"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorRevenue)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+          <motion.div variants={itemVariants}>
+            <StatsCard
+              title="Locataires Actifs"
+              value={tenants.filter((t) => t.status === "active").length}
+              description={`${tenants.length} total`}
+              change={5}
+              trend="up"
+              icon={<Users className="w-6 h-6" />}
+              variant="success"
+            />
+          </motion.div>
 
-          <ChartContainer title="Portfolio Composition" description="Distribution by property type">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={occupancyData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {occupancyData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </div>
+          <motion.div variants={itemVariants}>
+            <StatsCard
+              title="Revenu Mensuel"
+              value={`${(analytics.totalRevenue / 12 / 1000000).toFixed(1)}M`}
+              description="Moyenne par mois"
+              change={12}
+              trend="up"
+              icon={<DollarSign className="w-6 h-6" />}
+              variant="success"
+            />
+          </motion.div>
 
-        {/* Charts Row 2 */}
-        <ChartContainer title="Monthly Performance" description="Detailed breakdown of revenue and expenses">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                }}
-              />
-              <Legend />
-              <Bar dataKey="revenue" fill="#5d6dff" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="expenses" fill="#f59e0b" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartContainer>
+          <motion.div variants={itemVariants}>
+            <StatsCard
+              title="Taux d&apos;Occupation"
+              value={`${Math.round(analytics.occupancyRate)}%`}
+              description={`${analytics.vacancyRate.toFixed(0)}% vacants`}
+              change={-3}
+              trend="down"
+              icon={<TrendingUp className="w-6 h-6" />}
+              variant="warning"
+            />
+          </motion.div>
+        </motion.div>
 
-        {/* Insights Section */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Key Insights</h2>
-          <div className="space-y-3">
-            {insights.length > 0 ? (
-              insights.map((insight, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-4 rounded-lg bg-gray-50 p-4 border-l-4"
-                  style={{
-                    borderLeftColor:
-                      insight.type === 'alert' ? '#ef4444' : insight.type === 'warning' ? '#f59e0b' : '#22c55e',
-                  }}
-                >
-                  <AlertCircle
-                    className="h-5 w-5 flex-shrink-0 mt-1"
-                    style={{
-                      color:
-                        insight.type === 'alert' ? '#ef4444' : insight.type === 'warning' ? '#f59e0b' : '#22c55e',
-                    }}
+        {/* Charts Section */}
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          variants={containerVariants}
+        >
+          {/* Revenue Chart */}
+          <motion.div variants={itemVariants} className="lg:col-span-2">
+            <PremiumCard
+              header={
+                <CardHeader>
+                  <CardTitle>Revenus & Dépenses</CardTitle>
+                  <CardDescription>Tendance des 6 derniers mois</CardDescription>
+                </CardHeader>
+              }
+              padding="lg"
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={revenueData}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="date" stroke="#6b7280" style={{ fontSize: "12px" }} />
+                  <YAxis stroke="#6b7280" style={{ fontSize: "12px" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorRevenue)"
+                    name="Revenus"
                   />
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900">{insight.title}</p>
-                    <p className="text-sm text-gray-600">{insight.description}</p>
-                  </div>
+                  <Area
+                    type="monotone"
+                    dataKey="expenses"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    fillOpacity={0.1}
+                    name="Dépenses"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </PremiumCard>
+          </motion.div>
+
+          {/* Occupancy Chart */}
+          <motion.div variants={itemVariants}>
+            <PremiumCard
+              header={
+                <CardHeader>
+                  <CardTitle>Occupation</CardTitle>
+                  <CardDescription>État des propriétés</CardDescription>
+                </CardHeader>
+              }
+              padding="lg"
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={occupancyData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    <Cell fill="#10b981" />
+                    <Cell fill="#f59e0b" />
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </PremiumCard>
+          </motion.div>
+        </motion.div>
+
+        {/* Properties Table */}
+        <motion.div variants={itemVariants}>
+          <PremiumCard
+            header={
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Propriétés</CardTitle>
+                  <CardDescription>Liste complète de vos propriétés</CardDescription>
                 </div>
-              ))
+                <PremiumButton variant="primary" size="sm">
+                  Ajouter Propriété
+                </PremiumButton>
+              </div>
+            }
+            padding="lg"
+          >
+            {properties.length > 0 ? (
+              <DataTable columns={propertyColumns} data={properties} striped hoverable />
             ) : (
-              <p className="text-gray-500">No insights available yet. Add properties to generate insights.</p>
+              <div className="text-center py-12">
+                <p className="text-gray-600">Aucune propriété enregistrée</p>
+                <PremiumButton variant="primary" size="sm" className="mt-4">
+                  Créer votre première propriété
+                </PremiumButton>
+              </div>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+          </PremiumCard>
+        </motion.div>
+
+        {/* Alerts & Anomalies */}
+        {anomalies.length > 0 && (
+          <motion.div variants={itemVariants}>
+            <PremiumCard
+              header={
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                    Alertes et Anomalies
+                  </CardTitle>
+                </CardHeader>
+              }
+              padding="lg"
+            >
+              <div className="space-y-3">
+                {anomalies.map((anomaly, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-lg border-l-4 ${
+                      anomaly.severity === "high"
+                        ? "bg-red-50 border-red-300"
+                        : anomaly.severity === "medium"
+                        ? "bg-amber-50 border-amber-300"
+                        : "bg-blue-50 border-blue-300"
+                    }`}
+                  >
+                    <p className="font-semibold text-gray-900">{anomaly.message}</p>
+                    <p className="text-sm text-gray-600 mt-1">Détecté: {new Date(anomaly.detectedAt).toLocaleDateString("fr-FR")}</p>
+                  </div>
+                ))}
+              </div>
+            </PremiumCard>
+          </motion.div>
+        )}
+      </motion.div>
+    </DashboardShell>
   );
 }
